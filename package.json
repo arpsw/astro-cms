@@ -1,0 +1,51 @@
+{
+  "name": "@arpsw/astro-cms",
+  "version": "0.0.1",
+  "description": "Astro integration for the ARP (Laravel) CMS — shared API client, i18n/path resolution, and config wiring for ARP CMS sites.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "author": "ARP.software",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arpsw/astro-cms.git"
+  },
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "arp",
+    "cms"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "astro": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "astro": "^6.3.7",
+    "prettier": "^3.4.2",
+    "prettier-plugin-astro": "^0.14.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.2"
+  }
+}
