@@ -1,0 +1,30 @@
+---
+/**
+ * Optional generic block dispatcher. Looks up a component for `block.type` in
+ * the `components` map and renders it, passing the whole `block` (so the
+ * component reads `block.data`) plus any extra props through. Unknown types
+ * render nothing.
+ *
+ *   import CmsBlock from '@arpsw/astro-cms/CmsBlock.astro';
+ *   import Hero from '../components/blocks/Hero.astro';
+ *   const components = { hero: Hero };
+ *   {page.blocks.map((block) => <CmsBlock {block} {components} {locale} />)}
+ *
+ * Best for sites where blocks share a uniform prop signature. Sites that want
+ * per-block typed props (or extra per-type props) should hand-write a renderer
+ * with a `block.type` switch instead.
+ */
+import type { Block } from '../types';
+
+interface Props {
+  block: Block;
+  components: Record<string, unknown>;
+}
+
+const { block, components, ...rest } = Astro.props as Props & Record<string, unknown>;
+const Component = components[block.type] as
+  | ((props: Record<string, unknown>) => unknown)
+  | undefined;
+---
+
+{Component && <Component block={block} {...rest} />}

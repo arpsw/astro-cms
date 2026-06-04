@@ -110,9 +110,24 @@ if (redirect) return Astro.redirect(redirect.to, redirect.code);
 lookup → the nav menu fetch → the edge `Cache-Control` headers. The route stays
 ~15 lines; the package owns the plumbing, the site owns the design.
 
-A `<CmsBlock>` dispatcher (so you pass a `components` map once instead of
-switching by hand) and optional **route injection** follow `<CmsBlock>` in the
-roadmap.
+### Optional: `<CmsBlock>`
+
+For sites whose blocks share a uniform prop signature, a generic dispatcher
+saves the `block.type` switch:
+
+```astro
+import CmsBlock from '@arpsw/astro-cms/CmsBlock.astro';
+import Hero from '../components/blocks/Hero.astro';
+const components = { hero: Hero, features: Features };
+...
+{page.blocks.map((block) => <CmsBlock {block} {components} {locale} />)}
+```
+
+It renders `components[block.type]` with the whole `block` (read `block.data`)
+plus any extra props; unknown types render nothing. If your blocks need
+**per-type props or per-block typed `data`** (e.g. only the first block gets
+`isFirst`), hand-write a renderer with a `block.type` switch instead — that
+stays fully type-safe.
 
 ## Options
 
@@ -148,11 +163,12 @@ npm link @arpsw/astro-cms
   `getWebform`, …), API types, i18n/path resolution (`resolveRequest`,
   `resolveLocaleAndPath`, `getLocaleUrl`, `localePath`, `linkHref`). First
   consumer: `astro-website` (agiledrop).
-- next — `<CmsBlock>` dispatcher so you pass a `components` map instead of
-  switching on `block.type` by hand.
+- ✅ `<CmsBlock>` — optional generic dispatcher (`@arpsw/astro-cms/CmsBlock.astro`).
+  Per-block typed renderers remain the recommended pattern for varied props.
 - later — optional `injectRoute` for the catch-all + preview routes, a
-  translation (UI-strings) system, and `types` codegen from the Laravel API
-  resources.
+  translation (UI-strings) system + `media` helper + per-locale display
+  metadata (needed before `arp-software-website` can adopt the package), and
+  `types` codegen from the Laravel API resources.
 
 ## Publishing
 
