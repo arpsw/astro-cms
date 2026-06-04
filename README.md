@@ -8,11 +8,10 @@ Modelled on [`@storyblok/astro`](https://github.com/storyblok/monoblok/tree/main
 a single integration in `astro.config`, plus runtime helpers and a block
 dispatcher. The CMS is multi-site; one deployment serves one site (`site` slug).
 
-> **Status — `0.0.x` (scaffold).** Shipped: the `arpCms()` integration (i18n
-> routing + the `virtual:arp-cms` config module). Landing next (`0.1`): the
-> runtime client (`resolveRequest`, the CMS client functions, i18n helpers) and
-> the `<CmsBlock>` dispatcher. The runtime examples below mark what's not yet
-> published. See **Roadmap**.
+> **Status — `0.x` (pre-release).** Shipped: the `arpCms()` integration (i18n
+> routing + the `virtual:arp-cms` config module), the CMS client, API types,
+> i18n/path resolution, and `resolveRequest()`. Landing next: the `<CmsBlock>`
+> dispatcher (you currently map block types in the site). See **Roadmap**.
 
 ## Requirements
 
@@ -77,24 +76,26 @@ The integration then, on `astro:config:setup`:
 
 You do **not** repeat the `i18n` block or the `publicDir` tweak in your own config.
 
-## Render content *(runtime — landing in `0.1`)*
+## Render content
 
 Each site keeps a thin catch-all that wraps **its own** layout and maps block
-types to **its own** components:
+types to **its own** components. Import runtime helpers from the `/runtime`
+subpath (the `.` entry is the integration, kept free of runtime imports so it's
+safe in `astro.config`):
 
 ```astro
 ---
 // src/pages/[...slug].astro
 import Base from '../layouts/Base.astro';
-import { resolveRequest } from '@arpsw/astro-cms';   // ⟵ 0.1
+import { resolveRequest } from '@arpsw/astro-cms/runtime';
 import HomeHero from '../components/blocks/HomeHero.astro';
 import Features from '../components/blocks/Features.astro';
 
 const blocks = { home_hero: HomeHero, features: Features };
 
-const { locale, resolved, menu, redirect, status } = await resolveRequest(Astro);
+const { locale, resolved, menu, redirect } = await resolveRequest(Astro);
 if (redirect) return Astro.redirect(redirect.to, redirect.code);
-Astro.response.status = status;
+// resolveRequest already set Astro.response.status + Cache-Control.
 ---
 <Base mainMenu={menu?.items ?? []}>
   {resolved?.type === 'page' &&
@@ -143,14 +144,15 @@ npm link @arpsw/astro-cms
 
 ## Roadmap
 
-- `0.1` — extract the CMS client (`getPage`, `resolvePath`, `listPosts`,
-  `getMenu`, `getWebform`), API types, i18n helpers (`getLocaleUrl`,
-  `localePath`, `useTranslations`), and `resolveRequest`. First consumer:
-  `astro-website` (agiledrop).
-- `0.2` — `<CmsBlock>` dispatcher + a `components` map option (string-path
-  codegen, Storyblok-style).
-- later — optional `injectRoute` for the catch-all + preview routes,
-  the translation system, and `types` codegen from the Laravel API resources.
+- ✅ CMS client (`getPage`, `resolvePath`, `listPosts`, `getMenu`,
+  `getWebform`, …), API types, i18n/path resolution (`resolveRequest`,
+  `resolveLocaleAndPath`, `getLocaleUrl`, `localePath`, `linkHref`). First
+  consumer: `astro-website` (agiledrop).
+- next — `<CmsBlock>` dispatcher so you pass a `components` map instead of
+  switching on `block.type` by hand.
+- later — optional `injectRoute` for the catch-all + preview routes, a
+  translation (UI-strings) system, and `types` codegen from the Laravel API
+  resources.
 
 ## Publishing
 
