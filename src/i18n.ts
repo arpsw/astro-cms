@@ -51,6 +51,15 @@ export function getLocaleUrl(locale: Locale, path: string = '/'): string {
 }
 
 /**
+ * URL prefix configured for a content type in a locale (e.g. `post` → `blog`),
+ * from `config.contentTypePaths` (Site settings → `/config` `content_type_paths`).
+ * Returns undefined when unset — Page has no prefix (it lives at the site root).
+ */
+export function contentTypePath(type: string, locale: Locale): string | undefined {
+  return config.contentTypePaths[type]?.[locale] ?? undefined;
+}
+
+/**
  * Resolve the href for a CMS link. Internal links carry `{locale, path}`, so we
  * build the per-locale URL from the local website config; external/manual links
  * (no locale/path) use their literal `url`.

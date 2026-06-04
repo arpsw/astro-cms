@@ -47,6 +47,12 @@ export interface ArpCmsOptions {
   cache?: Partial<CacheConfig>;
   /** Per-locale canonical site URLs (no trailing slash); unset → path-prefix routing. */
   websiteUrls?: Record<string, string | undefined>;
+  /**
+   * Per-content-type, per-locale URL prefixes (e.g. `{ post: { en: 'blog' } }`),
+   * mirroring the CMS `/config` `content_type_paths`. Page has no prefix (it
+   * lives at the site root). Consumed by {@link contentTypePath}.
+   */
+  contentTypePaths?: Record<string, Record<string, string | undefined>>;
   /** Per-locale display metadata for the language switcher + RTL handling. */
   localeMeta?: Record<string, LocaleMeta>;
 }
@@ -61,6 +67,7 @@ export interface ResolvedArpCmsConfig {
   };
   cache: CacheConfig;
   websiteUrls: Record<string, string | undefined>;
+  contentTypePaths: Record<string, Record<string, string | undefined>>;
   localeMeta: Record<string, LocaleMeta>;
   locales: readonly string[];
   defaultLocale: string;
@@ -95,6 +102,7 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
     },
     cache: { ...DEFAULT_CACHE, ...options.cache },
     websiteUrls: options.websiteUrls ?? {},
+    contentTypePaths: options.contentTypePaths ?? {},
     localeMeta: options.localeMeta ?? {},
     locales: [...options.locales],
     defaultLocale,
