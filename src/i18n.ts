@@ -133,7 +133,7 @@ export function isRTL(locale: Locale): boolean {
  *   export const t = makeTranslator({ en: { cta: 'Contact' }, sl: { cta: 'Kontakt' } });
  *   // component: const s = t(locale); s.cta
  */
-export function makeTranslator<T>(dictionary: Record<string, T>): (locale: Locale) => T {
+export function makeTranslator<T>(dictionary: Partial<Record<string, T>>): (locale: Locale) => T {
   return (locale: Locale): T =>
     dictionary[locale] ?? dictionary[config.defaultLocale] ?? Object.values(dictionary)[0]!;
 }
