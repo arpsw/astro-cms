@@ -4,6 +4,18 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-06-05
+
+### Fixed
+
+- Build failure (`Could not resolve "virtual:arp-cms"`) when the package is
+  installed from a registry rather than a local symlink. The integration now
+  sets `vite.optimizeDeps.exclude` and `vite.ssr.noExternal` for
+  `@arpsw/astro-cms`, so its runtime — which imports the injected
+  `virtual:arp-cms` module — is neither esbuild pre-bundled nor SSR-externalized.
+  Linked installs were unaffected (Vite already skips both for linked deps),
+  which is why this only surfaced in clean CI/production builds.
+
 ## [0.3.1] - 2026-06-05
 
 ### Changed

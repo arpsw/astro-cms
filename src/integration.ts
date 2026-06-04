@@ -44,6 +44,16 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
             // 404 every `public/` asset in dev. Pass it explicitly (no trailing
             // slash) to bypass the cached path.
             publicDir: fileURLToPath(config.publicDir),
+            // Our runtime (`runtime.ts`/`config.ts`) imports `virtual:arp-cms`,
+            // resolved by virtualConfigPlugin below. Vite auto-skips esbuild
+            // pre-bundling and SSR externalization for *linked* deps, so this
+            // "just works" with a local symlink — but a registry install would
+            // (a) be pre-bundled, where esbuild can't resolve the virtual id,
+            // and (b) be externalized in the SSR build, leaving the import
+            // unresolved at runtime. Opt out of both so installed consumers
+            // behave like linked ones.
+            optimizeDeps: { exclude: ['@arpsw/astro-cms'] },
+            ssr: { noExternal: ['@arpsw/astro-cms'] },
           },
         });
 
