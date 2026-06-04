@@ -21,20 +21,10 @@ dispatcher. The CMS is multi-site; one deployment serves one site (`site` slug).
 
 ## Install
 
-The package is published to **GitHub Packages** under the `@arpsw` scope. Add a
-project-level `.npmrc` so npm resolves the scope from the GitHub registry:
-
-```ini
-# .npmrc (in the consuming site)
-@arpsw:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
-
-Then export a token with `read:packages` (a GitHub PAT locally; in CI the
-workflow's `GITHUB_TOKEN`) and install:
+The package is published to the **public npm registry** under the `@arpsw`
+scope — no registry config or auth token required:
 
 ```bash
-export NODE_AUTH_TOKEN=ghp_xxx        # local dev
 npm install @arpsw/astro-cms
 ```
 
