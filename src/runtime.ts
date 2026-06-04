@@ -35,7 +35,8 @@ export interface ResolveRequestResult {
 
 interface RequestContext {
   url: URL;
-  response: { status: number; headers: Headers };
+  // `status` is optional to match Astro's `Astro.response` (number | undefined).
+  response: { status?: number; headers: Headers };
 }
 
 /**

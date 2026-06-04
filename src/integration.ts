@@ -28,10 +28,12 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
             defaultLocale: resolved.defaultLocale,
             // Full object: `astro:config:setup`'s updateConfig uses the resolved
             // (strict) config type, unlike the shorthand defineConfig accepts.
-            // These are Astro's defaults — default-locale pages live at the root.
+            // Default-locale pages live at the root; `redirectToDefaultLocale`
+            // must be false when `prefixDefaultLocale` is false (Astro rejects
+            // true here — it would risk redirect loops).
             routing: {
               prefixDefaultLocale: false,
-              redirectToDefaultLocale: true,
+              redirectToDefaultLocale: false,
               fallbackType: 'redirect',
             },
           },
