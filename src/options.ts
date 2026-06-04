@@ -6,6 +6,18 @@
  * the site passes config explicitly here — typically wired from its own `.env`.
  */
 
+/** Per-locale display metadata for the language switcher + `<html dir>`. */
+export interface LocaleMeta {
+  /** Short uppercase code shown in the picker (EN, SL). */
+  code: string;
+  /** Endonym — the language's name in its own language. */
+  native: string;
+  /** Exonym in English (optional). */
+  english?: string;
+  /** Text direction; defaults to 'ltr'. */
+  dir?: 'ltr' | 'rtl';
+}
+
 /** Edge (Cloudflare) `Cache-Control` headers set by the SSR routes. */
 export interface CacheConfig {
   /** Successful page/post responses. */
@@ -35,6 +47,8 @@ export interface ArpCmsOptions {
   cache?: Partial<CacheConfig>;
   /** Per-locale canonical site URLs (no trailing slash); unset → path-prefix routing. */
   websiteUrls?: Record<string, string | undefined>;
+  /** Per-locale display metadata for the language switcher + RTL handling. */
+  localeMeta?: Record<string, LocaleMeta>;
 }
 
 /** Resolved config — serialized into the `virtual:arp-cms` module at build time. */
@@ -47,6 +61,7 @@ export interface ResolvedArpCmsConfig {
   };
   cache: CacheConfig;
   websiteUrls: Record<string, string | undefined>;
+  localeMeta: Record<string, LocaleMeta>;
   locales: readonly string[];
   defaultLocale: string;
 }
@@ -80,6 +95,7 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
     },
     cache: { ...DEFAULT_CACHE, ...options.cache },
     websiteUrls: options.websiteUrls ?? {},
+    localeMeta: options.localeMeta ?? {},
     locales: [...options.locales],
     defaultLocale,
   };

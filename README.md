@@ -129,6 +129,37 @@ plus any extra props; unknown types render nothing. If your blocks need
 `isFirst`), hand-write a renderer with a `block.type` switch instead — that
 stays fully type-safe.
 
+## Media & i18n helpers (`/runtime`)
+
+**Media** — normalise the DAM picker shape (`MediaAsset | MediaAsset[] | null`):
+
+```ts
+import { assetSrc, assetAlt, firstAsset, assetFocalPosition } from '@arpsw/astro-cms/runtime';
+const src = assetSrc(block.image, 'large');   // best size, falls back to .url
+const alt = assetAlt(block.image);            // alt → title → ''
+const pos = assetFocalPosition(block.image);  // "50% 30%" for object-position, or undefined
+```
+
+**Language switcher** — one entry per configured locale (labels from `localeMeta`):
+
+```ts
+import { languageSwitchEntries, isRTL } from '@arpsw/astro-cms/runtime';
+const entries = languageSwitchEntries(Astro.url); // [{ locale, code, native, href, isActive, hreflang }]
+```
+
+**UI translations** — the package owns the *mechanism*, the site owns the
+*content*. Define a per-locale dictionary and get a typed lookup:
+
+```ts
+// site src/i18n.ts
+import { makeTranslator } from '@arpsw/astro-cms/runtime';
+export const t = makeTranslator({
+  en: { footer: { contact: 'Contact us' } },
+  sl: { footer: { contact: 'Kontaktirajte nas' } },
+});
+// component: const s = t(locale); s.footer.contact   (falls back to default locale)
+```
+
 ## Options
 
 | Option | Required | Default | Notes |
@@ -141,6 +172,7 @@ stays fully type-safe.
 | `previewToken` | | — | Bearer for `preview/*`; omit to disable preview |
 | `cache` | | sensible defaults | `Cache-Control` overrides (`page`/`notFound`/`error`/`preview`) |
 | `websiteUrls` | | `{}` | Per-locale canonical URLs; unset → path-prefix routing |
+| `localeMeta` | | `{}` | Per-locale display data (`code`, `native`, `english?`, `dir?`) for the language switcher + RTL |
 
 ## Local development of this package
 

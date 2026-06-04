@@ -117,4 +117,5 @@ function cacheHeaderFor(
 export { config } from './config';
 export * from './client';
 export * from './i18n';
+export * from './media';
 export type * from './types';

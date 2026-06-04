@@ -118,3 +118,59 @@ export function resolveLocaleAndPath(url: URL): { locale: Locale; path: string }
 export function resolveLocale(url: URL): Locale {
   return resolveLocaleAndPath(url).locale;
 }
+
+/** True when the locale is configured (in `localeMeta`) as right-to-left. */
+export function isRTL(locale: Locale): boolean {
+  return (config.localeMeta[locale]?.dir ?? 'ltr') === 'rtl';
+}
+
+/**
+ * UI-strings translation mechanism. The package owns the *shape*; the site owns
+ * the *content*. Pass a per-locale dictionary; get a `(locale) => strings`
+ * lookup that falls back to the default locale then the first entry.
+ *
+ *   // site src/i18n.ts
+ *   export const t = makeTranslator({ en: { cta: 'Contact' }, sl: { cta: 'Kontakt' } });
+ *   // component: const s = t(locale); s.cta
+ */
+export function makeTranslator<T>(dictionary: Record<string, T>): (locale: Locale) => T {
+  return (locale: Locale): T =>
+    dictionary[locale] ?? dictionary[config.defaultLocale] ?? Object.values(dictionary)[0]!;
+}
+
+export interface LanguageSwitchEntry {
+  locale: Locale;
+  /** Uppercase code from localeMeta (EN), or the upper-cased locale. */
+  code: string;
+  /** Endonym from localeMeta, or the locale code. */
+  native: string;
+  href: string;
+  hreflang: string;
+  isActive: boolean;
+}
+
+/**
+ * One entry per configured locale, each linking to the equivalent path in that
+ * locale (host/prefix-aware). Labels come from `localeMeta` (passed to
+ * `arpCms({ localeMeta })`); missing metadata falls back to the locale code.
+ */
+export function languageSwitchEntries(currentUrl: URL): LanguageSwitchEntry[] {
+  const { locale: currentLocale, path: logicalPath } = resolveLocaleAndPath(currentUrl);
+
+  return config.locales.map((l) => {
+    const site = getLocaleSite(l);
+    const href = site
+      ? `${site.origin}${site.pathname.replace(/\/+$/, '')}${logicalPath === '/' ? '' : logicalPath}`
+      : localePath(l, logicalPath);
+    const meta = config.localeMeta[l];
+
+    return {
+      locale: l,
+      code: meta?.code ?? l.toUpperCase(),
+      native: meta?.native ?? l,
+      href,
+      hreflang: l,
+      isActive: l === currentLocale,
+    };
+  });
+}
