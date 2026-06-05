@@ -3,8 +3,9 @@
  *
  * Re-exports the CMS client + i18n helpers, and adds `resolveRequest()`: the
  * one-call request handler a site's catch-all route uses. This module reads the
- * resolved config from `virtual:arp-cms`, so it must NOT be imported from
- * `astro.config` (use the `.` entry — the integration — there).
+ * resolved config (injected by the integration as a Vite `define`), so it must
+ * NOT be imported from `astro.config` (use the `.` entry — the integration —
+ * there); the define is only applied to the app/runtime build.
  */
 import { config } from './config';
 import { CmsApiError, getMenu, resolvePath, resolvePathPreview } from './client';

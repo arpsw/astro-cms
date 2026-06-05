@@ -1,6 +1,6 @@
 /**
  * Typed client for the ARP CMS API. Connection + site come from the resolved
- * config (`virtual:arp-cms`); every content endpoint is scoped to the site via
+ * config (injected by the integration as a Vite `define`); every content endpoint is scoped to the site via
  * `/api/cms/v1/sites/{site}`.
  */
 import { config } from './config';

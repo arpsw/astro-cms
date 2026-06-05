@@ -1,19 +1,17 @@
 import { fileURLToPath } from 'node:url';
 import type { AstroIntegration } from 'astro';
-import type { Plugin } from 'vite';
-import { resolveOptions, type ArpCmsOptions, type ResolvedArpCmsConfig } from './options';
+import { resolveOptions, type ArpCmsOptions } from './options';
 
-const VIRTUAL_ID = 'virtual:arp-cms';
-const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID;
+/** Compile-time global carrying the resolved config to runtime code (`./config`). */
+const CONFIG_DEFINE_KEY = '__ARP_CMS_CONFIG__';
 
 /**
  * The ARP CMS Astro integration.
  *
  * Wires the boilerplate every ARP CMS site repeats: it configures Astro's i18n
  * routing from `locales`/`defaultLocale`, applies the `publicDir` dev workaround,
- * and publishes the resolved connection/locale/cache config to runtime code
- * through the `virtual:arp-cms` module (consumed by `@arpsw/astro-cms`'s client
- * and i18n helpers).
+ * and injects the resolved connection/locale/cache config into runtime code as a
+ * Vite `define` global (consumed by `@arpsw/astro-cms`'s client and i18n helpers).
  */
 export function arpCms(options: ArpCmsOptions): AstroIntegration {
   const resolved = resolveOptions(options);
@@ -38,21 +36,25 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
             },
           },
           vite: {
-            plugins: [virtualConfigPlugin(resolved)],
             // Astro passes `publicDir` with a trailing slash, which makes Vite's
             // initPublicFiles strip the leading slash from cached filenames and
             // 404 every `public/` asset in dev. Pass it explicitly (no trailing
             // slash) to bypass the cached path.
             publicDir: fileURLToPath(config.publicDir),
-            // Our runtime (`runtime.ts`/`config.ts`) imports `virtual:arp-cms`,
-            // resolved by virtualConfigPlugin below. Vite auto-skips esbuild
-            // pre-bundling and SSR externalization for *linked* deps, so this
-            // "just works" with a local symlink — but a registry install would
-            // (a) be pre-bundled, where esbuild can't resolve the virtual id,
-            // and (b) be externalized in the SSR build, leaving the import
-            // unresolved at runtime. Opt out of both so installed consumers
-            // behave like linked ones.
-            optimizeDeps: { exclude: ['@arpsw/astro-cms'] },
+            // Inject the resolved config as a compile-time constant; `./config`
+            // reads `__ARP_CMS_CONFIG__` and Vite replaces it inline at build
+            // time. We deliberately avoid a Vite *virtual module* here: one that
+            // is statically imported by published runtime code can't survive
+            // dependency optimization (esbuild can't resolve a plugin-provided
+            // virtual id) or SSR externalization. A `define` global has nothing
+            // to resolve, so it works whether the package is linked, installed,
+            // pre-bundled, or bundled into the SSR worker.
+            define: {
+              [CONFIG_DEFINE_KEY]: JSON.stringify(resolved),
+            },
+            // Bundle (don't externalize) the package in the SSR build so the
+            // `define` above is applied to its runtime; an externalized dep would
+            // ship the bare `__ARP_CMS_CONFIG__` reference unreplaced.
             ssr: { noExternal: ['@arpsw/astro-cms'] },
           },
         });
@@ -63,25 +65,6 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
           )}] · default "${resolved.defaultLocale}"`,
         );
       },
-    },
-  };
-}
-
-/** Serves the resolved config as the `virtual:arp-cms` module to runtime code. */
-function virtualConfigPlugin(resolved: ResolvedArpCmsConfig): Plugin {
-  return {
-    name: 'arp-cms:virtual-config',
-    resolveId(id) {
-      if (id === VIRTUAL_ID) {
-        return RESOLVED_VIRTUAL_ID;
-      }
-      return undefined;
-    },
-    load(id) {
-      if (id === RESOLVED_VIRTUAL_ID) {
-        return `export const config = ${JSON.stringify(resolved)};\nexport default config;`;
-      }
-      return undefined;
     },
   };
 }

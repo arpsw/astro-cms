@@ -1,7 +1,7 @@
 // TypeScript shapes mirroring the Laravel CMS API resources.
 // Source of truth: Modules/Cms/app/Http/Resources/*.php
 //
-// Pure types — no runtime, no `virtual:arp-cms` import — so this entry is safe
+// Pure types — no runtime, no config import — so this entry is safe
 // to import anywhere (including astro.config). `Locale` is a plain string here:
 // the locale set is provided at runtime via the integration, so the package
 // can't derive a literal union. Sites that want a narrow union can declare

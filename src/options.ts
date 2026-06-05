@@ -1,6 +1,6 @@
 /**
  * Public options for the `arpCms()` integration, and the resolved, serializable
- * config shape that gets exposed to runtime code via `virtual:arp-cms`.
+ * config shape that gets injected into runtime code as a Vite `define`.
  *
  * The integration runs in the consumer's `astro.config` (Node, before Vite), so
  * the site passes config explicitly here — typically wired from its own `.env`.
@@ -57,7 +57,7 @@ export interface ArpCmsOptions {
   localeMeta?: Record<string, LocaleMeta>;
 }
 
-/** Resolved config — serialized into the `virtual:arp-cms` module at build time. */
+/** Resolved config — serialized into the `__ARP_CMS_CONFIG__` define at build time. */
 export interface ResolvedArpCmsConfig {
   cms: {
     baseUrl: string;

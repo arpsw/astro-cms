@@ -4,17 +4,28 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-06-05
+
+### Fixed
+
+- Build failure `Could not resolve "virtual:arp-cms"` in clean/registry installs
+  (Linux/CI, e.g. Cloudflare). Root cause: shipped runtime code statically
+  imported the `virtual:arp-cms` module, which can't survive Vite's dependency
+  optimization (esbuild can't resolve a plugin-provided virtual id) or SSR
+  externalization. The resolved config is now injected as a Vite `define`
+  constant (`__ARP_CMS_CONFIG__`) and read inline — no virtual module is
+  imported by published code — with `ssr.noExternal` ensuring the runtime is
+  bundled (and thus the define applied) in the SSR build. The 0.3.2
+  `optimizeDeps` mitigations are removed.
+
 ## [0.3.2] - 2026-06-05
 
 ### Fixed
 
-- Build failure (`Could not resolve "virtual:arp-cms"`) when the package is
-  installed from a registry rather than a local symlink. The integration now
-  sets `vite.optimizeDeps.exclude` and `vite.ssr.noExternal` for
-  `@arpsw/astro-cms`, so its runtime — which imports the injected
-  `virtual:arp-cms` module — is neither esbuild pre-bundled nor SSR-externalized.
-  Linked installs were unaffected (Vite already skips both for linked deps),
-  which is why this only surfaced in clean CI/production builds.
+- Attempted fix for the registry-install build failure via
+  `vite.optimizeDeps.exclude` + `vite.ssr.noExternal`. This worked on macOS but
+  **not** on Linux/CI; superseded by 0.3.3, which removes the static virtual
+  import entirely.
 
 ## [0.3.1] - 2026-06-05
 

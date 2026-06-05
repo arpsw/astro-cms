@@ -7,7 +7,6 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   target: 'es2022',
-  // `astro` is a peer dependency; `virtual:arp-cms` is provided by the
-  // integration at the consumer's build time. Neither is bundled.
-  external: ['astro', 'virtual:arp-cms'],
+  // `astro` is a peer dependency — not bundled.
+  external: ['astro'],
 });

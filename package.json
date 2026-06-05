@@ -1,6 +1,6 @@
 {
   "name": "@arpsw/astro-cms",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Astro integration for the ARP (Laravel) CMS — shared API client, i18n/path resolution, and config wiring for ARP CMS sites.",
   "type": "module",
   "license": "UNLICENSED",
