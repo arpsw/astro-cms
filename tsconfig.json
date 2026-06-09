@@ -8,7 +8,16 @@
     "types": ["astro/client", "node"],
     "noEmit": true,
     "skipLibCheck": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    // Resolve our own package self-references (used by the injected route, which
+    // imports the public runtime by name so it stays external at runtime) to
+    // source during type-checking + dts build. Without this, a clean dts build
+    // can't find the precise types and widens them (e.g. `sameSite: string`).
+    "baseUrl": ".",
+    "paths": {
+      "@arpsw/astro-cms": ["./src/index.ts"],
+      "@arpsw/astro-cms/runtime": ["./src/runtime.ts"]
+    }
   },
   "include": ["src", "*.ts"]
 }
