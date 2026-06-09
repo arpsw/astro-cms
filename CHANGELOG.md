@@ -4,6 +4,32 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-08
+
+### Added
+
+- Browser-facing **preview sessions** (`src/preview.ts`, re-exported from
+  `@arpsw/astro-cms/runtime`). The server↔CMS `previewToken` is no longer
+  sufficient to view drafts by visiting `/preview/*` directly: a browser must
+  hold a signed, httpOnly, time-boxed cookie. New helpers:
+  - `previewTokenMatches(provided)` — constant-time check of an editor-presented
+    enter token against the configured secret.
+  - `createPreviewSession()` — mint a signed `<expiryMs>.<hmac>` cookie value
+    (HMAC-SHA256 via Web Crypto, keyed by `previewToken`; works on Cloudflare
+    Workers and Node).
+  - `verifyPreviewSession(value)` — validate signature + expiry.
+  - `previewCookieOptions(secure, maxAge)` and `PREVIEW_COOKIE_NAME`.
+  - `isPreviewConfigured()`.
+- `previewCookieTtl` integration option → resolved `preview.cookieTtl` (seconds,
+  default 3600).
+
+### Notes
+
+- Additive and backwards compatible — no changes required for sites that don't
+  use the new helpers. Sites adopting the cookie gate add a `/preview/enter`
+  endpoint (validate token → set cookie → redirect) and check
+  `verifyPreviewSession()` in their `/preview/*` routes. See the README.
+
 ## [0.3.3] - 2026-06-05
 
 ### Fixed

@@ -160,9 +160,67 @@ export const t = makeTranslator({
 | `defaultLocale` | | `locales[0]` | Must be one of `locales`, else ignored |
 | `menuSlug` | | `"main"` | Nav menu slug |
 | `previewToken` | | — | Bearer for `preview/*`; omit to disable preview |
+| `previewCookieTtl` | | `3600` | Preview-session cookie lifetime (seconds) |
 | `cache` | | sensible defaults | `Cache-Control` overrides (`page`/`notFound`/`error`/`preview`) |
 | `websiteUrls` | | `{}` | Per-locale canonical URLs; unset → path-prefix routing |
 | `localeMeta` | | `{}` | Per-locale display data (`code`, `native`, `english?`, `dir?`) for the language switcher + RTL |
+
+## Preview sessions
+
+Draft content lives behind the CMS `preview/*` endpoints, authed by the
+server↔CMS `previewToken`. That token stays server-side — it is **not** what
+authorizes a browser to view `/preview/*`. Otherwise anyone who knew the URL
+could read drafts.
+
+Instead, the package ships a "secret-to-bootstrap, cookie-to-sustain" handshake
+(the same model as Payload CMS / Next.js Draft Mode):
+
+1. An editor opens `/preview/enter?token=<previewToken>&path=/some-page`
+   (typically from a "Preview" action in the CMS admin).
+2. The site's enter endpoint calls `previewTokenMatches()`, then
+   `createPreviewSession()` to mint a signed, httpOnly, time-boxed cookie, and
+   redirects to the page. The token appears only on this one bare-redirect
+   request, so it can't leak via Referer.
+3. Each `/preview/*` route calls `verifyPreviewSession()` on the cookie before
+   fetching drafts — no valid cookie, no CMS call.
+
+The site owns the two routes (so it controls the UI); the package owns the
+crypto. Minimal enter endpoint:
+
+```ts
+// src/pages/preview/enter.ts
+import type { APIRoute } from 'astro';
+import {
+  createPreviewSession, isPreviewConfigured, previewCookieOptions,
+  previewTokenMatches, PREVIEW_COOKIE_NAME,
+} from '@arpsw/astro-cms/runtime';
+
+export const prerender = false;
+
+export const GET: APIRoute = async ({ url, cookies, redirect }) => {
+  if (!isPreviewConfigured()) return new Response('Preview not configured.', { status: 503 });
+  if (!previewTokenMatches(url.searchParams.get('token')))
+    return new Response('Invalid preview token.', { status: 401 });
+
+  const session = await createPreviewSession();
+  cookies.set(PREVIEW_COOKIE_NAME, session.value,
+    previewCookieOptions(url.protocol === 'https:', session.maxAge));
+  return redirect('/preview' + (url.searchParams.get('path') ?? ''), 302);
+};
+```
+
+Gate in the `/preview/*` route:
+
+```ts
+import { verifyPreviewSession, PREVIEW_COOKIE_NAME } from '@arpsw/astro-cms/runtime';
+const authorized = await verifyPreviewSession(Astro.cookies.get(PREVIEW_COOKIE_NAME)?.value);
+if (!authorized) { Astro.response.status = 401; /* render a "no session" notice */ }
+```
+
+The cookie carries `<expiryMs>.<hmac>` (HMAC-SHA256 keyed by `previewToken`); the
+expiry is re-checked server-side, so a kept-alive cookie still dies on schedule.
+`secure` is caller-supplied so it sets over http on localhost but is `Secure` in
+prod — derive it from the request protocol as shown.
 
 ## Local development of this package
 

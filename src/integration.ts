@@ -19,7 +19,17 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
   return {
     name: '@arpsw/astro-cms',
     hooks: {
-      'astro:config:setup': ({ config, updateConfig, logger }) => {
+      'astro:config:setup': ({ config, updateConfig, injectRoute, logger }) => {
+        // Ship the preview enter-handshake endpoint so every CMS site gets an
+        // identical, maintained `/preview/enter` (validate token → set signed
+        // cookie → redirect). It's pure logic — no site UI — so it lives here;
+        // the content preview route stays in the site (it renders site layout).
+        injectRoute({
+          pattern: '/preview/enter',
+          entrypoint: fileURLToPath(new URL('./routes/preview-enter.js', import.meta.url)),
+          prerender: false,
+        });
+
         updateConfig({
           i18n: {
             locales: [...resolved.locales],

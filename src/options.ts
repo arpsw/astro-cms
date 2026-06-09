@@ -43,6 +43,11 @@ export interface ArpCmsOptions {
   menuSlug?: string;
   /** Bearer token for the `preview/*` endpoints; omit to disable preview. */
   previewToken?: string;
+  /**
+   * Lifetime, in seconds, of the signed preview-session cookie minted by the
+   * enter-preview handshake. Defaults to 3600 (1 hour).
+   */
+  previewCookieTtl?: number;
   /** Per-locale `Cache-Control` overrides; sensible defaults are applied. */
   cache?: Partial<CacheConfig>;
   /** Per-locale canonical site URLs (no trailing slash); unset → path-prefix routing. */
@@ -64,6 +69,11 @@ export interface ResolvedArpCmsConfig {
     site: string;
     previewToken?: string;
     menuSlug: string;
+  };
+  /** Browser-facing preview session settings. */
+  preview: {
+    /** Signed preview-cookie lifetime in seconds. */
+    cookieTtl: number;
   };
   cache: CacheConfig;
   websiteUrls: Record<string, string | undefined>;
@@ -99,6 +109,12 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
       site: options.site.trim(),
       previewToken: options.previewToken || undefined,
       menuSlug: (options.menuSlug ?? 'main').trim(),
+    },
+    preview: {
+      cookieTtl:
+        options.previewCookieTtl && options.previewCookieTtl > 0
+          ? Math.floor(options.previewCookieTtl)
+          : 3600,
     },
     cache: { ...DEFAULT_CACHE, ...options.cache },
     websiteUrls: options.websiteUrls ?? {},
