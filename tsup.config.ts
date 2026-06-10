@@ -1,7 +1,13 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/runtime.ts', 'src/types.ts', 'src/routes/preview-enter.ts'],
+  entry: [
+    'src/index.ts',
+    'src/runtime.ts',
+    'src/types.ts',
+    'src/routes/preview-enter.ts',
+    'src/routes/sitemap.ts',
+  ],
   format: ['esm'],
   dts: true,
   clean: true,

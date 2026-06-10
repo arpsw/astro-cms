@@ -30,6 +30,16 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
           prerender: false,
         });
 
+        // SSR sitemap built from the CMS's published-content inventory — the
+        // sitemap must be served from the frontend's domain, but the CMS is
+        // the source of truth for what exists. Always current (publishing
+        // busts the CMS cache), no rebuild involved.
+        injectRoute({
+          pattern: '/sitemap.xml',
+          entrypoint: fileURLToPath(new URL('./routes/sitemap.js', import.meta.url)),
+          prerender: false,
+        });
+
         updateConfig({
           i18n: {
             locales: [...resolved.locales],

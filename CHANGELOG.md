@@ -4,6 +4,30 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-10
+
+### Added
+
+- **Named content: regions & global blocks.** New client helpers, re-exported
+  from `@arpsw/astro-cms/runtime`:
+  - `getRegion(slug, locale)` — fetch a declared region (e.g. `footer`): its
+    global blocks, locale-resolved and ordered, in the same shape as a page's
+    `blocks` array so the regular block dispatcher renders them.
+  - `getGlobalBlock(slug, locale)` — fetch one shared global block instance.
+- Types: `Region`, `GlobalBlockResult`; `Block` gains an optional `global`
+  field (the slug of the global block an inlined reference came from).
+- **SSR `/sitemap.xml`**, injected into every consumer site: built per request
+  from the CMS's new `/sitemap` inventory endpoint (all published routable
+  content with URL + lastmod), with hreflang alternates across locales and an
+  `x-default` pointing at the default-locale variant. Always current — no
+  rebuild involved. The raw inventory is also exposed as
+  `getSitemapInventory()` (`SitemapEntry` type) for custom sitemaps.
+- `getConfig()` — fetch the site's live `/config` payload (`SiteConfig` type).
+  Unlike the integration options (baked at build time), this reflects the CMS
+  now; it carries `custom_scripts.head` / `custom_scripts.body` — per-locale
+  raw HTML the layout injects into `<head>` / before `</body>` — so script
+  changes go live without a rebuild.
+
 ## [0.4.0] - 2026-06-08
 
 ### Added

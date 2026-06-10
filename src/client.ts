@@ -5,6 +5,7 @@
  */
 import { config } from './config';
 import type {
+  GlobalBlockResult,
   Locale,
   Menu,
   Page,
@@ -12,7 +13,10 @@ import type {
   PaginatedResponse,
   Post,
   RedirectEnvelope,
+  Region,
   Resolved,
+  SiteConfig,
+  SitemapEntry,
   Webform,
 } from './types';
 
@@ -199,6 +203,42 @@ export async function getPost(slug: string, locale: Locale): Promise<Post> {
 
 export async function getMenu(slug: string, locale: Locale): Promise<Menu> {
   return unwrap(await fetchJson<{ data: Menu }>(`/menus/${slug}`, { locale }));
+}
+
+// --- Site config -------------------------------------------------------------
+
+/**
+ * The site's live runtime config. Unlike the integration options (baked at
+ * build time), this reflects the CMS NOW — use it for values that must change
+ * without a rebuild, e.g. the per-locale custom scripts the layout injects.
+ */
+export async function getConfig(): Promise<SiteConfig> {
+  return fetchJson<SiteConfig>('/config');
+}
+
+// --- Sitemap inventory --------------------------------------------------------
+
+/**
+ * Every published, routable record of the site (pages, posts, module content
+ * types) with absolute URL + lastmod. The injected `/sitemap.xml` route turns
+ * this into the actual sitemap; exposed for sites that want a custom one.
+ */
+export async function getSitemapInventory(): Promise<SitemapEntry[]> {
+  return unwrap(await fetchJson<{ data: SitemapEntry[] }>('/sitemap'));
+}
+
+// --- Named content: regions & global blocks ---------------------------------
+//
+// Regions are declared frontend slots (footer, announcement bar) filled with
+// shared "global blocks" in the CMS. The payload's `blocks` array has the same
+// shape as a page's, so render it with the same block components.
+
+export async function getRegion(slug: string, locale: Locale): Promise<Region> {
+  return unwrap(await fetchJson<{ data: Region }>(`/regions/${slug}`, { locale }));
+}
+
+export async function getGlobalBlock(slug: string, locale: Locale): Promise<GlobalBlockResult> {
+  return unwrap(await fetchJson<{ data: GlobalBlockResult }>(`/global-blocks/${slug}`, { locale }));
 }
 
 // --- Webforms --------------------------------------------------------------

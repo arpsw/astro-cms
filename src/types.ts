@@ -42,6 +42,65 @@ export interface ResolvedLink {
 export interface Block<T = Record<string, unknown>> {
   type: string;
   data: T;
+  /**
+   * Set when this block was inlined from a shared global block (the CMS
+   * resolves `global_block` references at serialization time) — the slug of
+   * the global block instance. Purely informational for the frontend.
+   */
+  global?: string;
+}
+
+/**
+ * A named region (e.g. `footer`): a declared frontend slot filled with global
+ * blocks, served in the same shape as a page's `blocks` array so the regular
+ * block dispatcher renders it.
+ */
+export interface Region {
+  region: string;
+  locale: string;
+  blocks: Block[];
+}
+
+/** A single global (shared) block instance fetched directly by slug. */
+export interface GlobalBlockResult {
+  slug: string;
+  locale: string | null;
+  region: string | null;
+  block: Block;
+}
+
+/**
+ * One row of the `/sitemap` inventory: a published, routable record with its
+ * absolute URL and lastmod. Entries sharing `type` + `slug` are the same
+ * document in different locales (group them into hreflang alternates).
+ */
+export interface SitemapEntry {
+  type: string;
+  slug: string;
+  locale: string;
+  path: string;
+  url: string;
+  updated_at: string | null;
+}
+
+/**
+ * The `/config` payload: the site's runtime configuration as the CMS sees it
+ * NOW (the `arpCms()` integration options are the build-time equivalent).
+ * Fetch via `getConfig()` for values that should change without a rebuild —
+ * e.g. the per-locale custom scripts injected into the layout.
+ */
+export interface SiteConfig {
+  site: string;
+  locales: string[];
+  default_locale: string;
+  content_type_paths: Record<string, Record<string, string>>;
+  website_urls: Record<string, string>;
+  custom_scripts: {
+    /** Raw HTML injected into <head>, keyed by locale. */
+    head: Record<string, string>;
+    /** Raw HTML injected before </body>, keyed by locale. */
+    body: Record<string, string>;
+  };
 }
 
 export interface PageMeta {
