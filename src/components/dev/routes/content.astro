@@ -1,0 +1,25 @@
+---
+/**
+ * Injected by arpCms() at `/dev/content/[type]` in dev only. Renders a content
+ * type's real view from its fixture, inside the site's layout.
+ */
+export const prerender = false;
+// @ts-expect-error resolved in the consumer via the integration alias
+import { content, Layout } from 'arpsw:dev-site';
+import Content from '../Content.astro';
+import { findContentType } from '@arpsw/astro-cms/dev';
+
+const { type } = Astro.params;
+const def = findContentType(content, type ?? '');
+const SiteLayout = Layout as any;
+---
+
+<SiteLayout title={def ? `${def.title} (content type)` : 'Unknown content type'}>
+  {
+    def ? (
+      <Content definition={def} />
+    ) : (
+      <p style="padding:40px 24px;">Unknown content type: <code>{type}</code></p>
+    )
+  }
+</SiteLayout>

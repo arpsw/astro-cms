@@ -1,0 +1,22 @@
+---
+/**
+ * Renders one registered content type with its example item, through the site's
+ * real view component (PageView, PostView, CaseStudyView, …). The item is passed
+ * under the view's expected prop name (definition.prop).
+ */
+import type { ContentTypeDefinition } from '@arpsw/astro-cms/dev';
+
+interface Props {
+  definition: ContentTypeDefinition;
+  example?: string;
+}
+const { definition, example } = Astro.props;
+const exs = definition.examples ?? [];
+const data = exs.length
+  ? (example ? (exs.find((e) => e.name === example)?.data ?? exs[0].data) : exs[0].data)
+  : {};
+const View = definition.view as any;
+const viewProps = { [definition.prop]: data };
+---
+
+{View && <View {...viewProps} />}

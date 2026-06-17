@@ -1,0 +1,21 @@
+---
+/**
+ * Renders one registered block with its example data. Used by the gallery and
+ * available to sites for hand-authored /dev pages. The block component receives
+ * the example `data` (the convention both ARP sites already use).
+ */
+import type { BlockDefinition } from '@arpsw/astro-cms/dev';
+
+interface Props {
+  definition: BlockDefinition;
+  example?: string;
+}
+const { definition, example } = Astro.props;
+const exs = definition.examples ?? [];
+const data = exs.length
+  ? (example ? (exs.find((e) => e.name === example)?.data ?? exs[0].data) : exs[0].data)
+  : {};
+const Component = definition.component as any;
+---
+
+{Component && <Component data={data} />}

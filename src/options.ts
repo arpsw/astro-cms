@@ -15,7 +15,7 @@ export interface LocaleMeta {
   /** Exonym in English (optional). */
   english?: string;
   /** Text direction; defaults to 'ltr'. */
-  dir?: 'ltr' | 'rtl';
+  dir?: "ltr" | "rtl";
 }
 
 /** Edge (Cloudflare) `Cache-Control` headers set by the SSR routes. */
@@ -60,6 +60,13 @@ export interface ArpCmsOptions {
   contentTypePaths?: Record<string, Record<string, string | undefined>>;
   /** Per-locale display metadata for the language switcher + RTL handling. */
   localeMeta?: Record<string, LocaleMeta>;
+  /**
+   * Path (relative to the project root) to the site's dev-kit module, which
+   * exports `blocks`, optional `content`, and a `Layout`. When set, the
+   * integration injects the offline `/dev` routes (gallery + content previews)
+   * in `dev` only. Omit to disable the dev kit.
+   */
+  devKit?: string;
 }
 
 /** Resolved config — serialized into the `__ARP_CMS_CONFIG__` define at build time. */
@@ -84,17 +91,20 @@ export interface ResolvedArpCmsConfig {
 }
 
 const DEFAULT_CACHE: CacheConfig = {
-  page: 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
-  notFound: 'public, max-age=0, s-maxage=60',
-  error: 'no-store',
-  preview: 'no-store, no-cache, must-revalidate',
+  page: "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+  notFound: "public, max-age=0, s-maxage=60",
+  error: "no-store",
+  preview: "no-store, no-cache, must-revalidate",
 };
 
-const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
+const trimTrailingSlashes = (value: string): string =>
+  value.replace(/\/+$/, "");
 
 export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
   if (!options.locales?.length) {
-    throw new Error('[@arpsw/astro-cms] `locales` must list at least one locale.');
+    throw new Error(
+      "[@arpsw/astro-cms] `locales` must list at least one locale.",
+    );
   }
 
   const fallback = options.locales[0]!;
@@ -108,7 +118,7 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
       baseUrl: trimTrailingSlashes(options.baseUrl),
       site: options.site.trim(),
       previewToken: options.previewToken || undefined,
-      menuSlug: (options.menuSlug ?? 'main').trim(),
+      menuSlug: (options.menuSlug ?? "main").trim(),
     },
     preview: {
       cookieTtl:

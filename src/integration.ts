@@ -1,9 +1,9 @@
-import { fileURLToPath } from 'node:url';
-import type { AstroIntegration } from 'astro';
-import { resolveOptions, type ArpCmsOptions } from './options';
+import { fileURLToPath } from "node:url";
+import type { AstroIntegration } from "astro";
+import { resolveOptions, type ArpCmsOptions } from "./options";
 
 /** Compile-time global carrying the resolved config to runtime code (`./config`). */
-const CONFIG_DEFINE_KEY = '__ARP_CMS_CONFIG__';
+const CONFIG_DEFINE_KEY = "__ARP_CMS_CONFIG__";
 
 /**
  * The ARP CMS Astro integration.
@@ -17,16 +17,24 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
   const resolved = resolveOptions(options);
 
   return {
-    name: '@arpsw/astro-cms',
+    name: "@arpsw/astro-cms",
     hooks: {
-      'astro:config:setup': ({ config, updateConfig, injectRoute, logger }) => {
+      "astro:config:setup": ({
+        config,
+        command,
+        updateConfig,
+        injectRoute,
+        logger,
+      }) => {
         // Ship the preview enter-handshake endpoint so every CMS site gets an
         // identical, maintained `/preview/enter` (validate token → set signed
         // cookie → redirect). It's pure logic — no site UI — so it lives here;
         // the content preview route stays in the site (it renders site layout).
         injectRoute({
-          pattern: '/preview/enter',
-          entrypoint: fileURLToPath(new URL('./routes/preview-enter.js', import.meta.url)),
+          pattern: "/preview/enter",
+          entrypoint: fileURLToPath(
+            new URL("./routes/preview-enter.js", import.meta.url),
+          ),
           prerender: false,
         });
 
@@ -35,10 +43,47 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
         // the source of truth for what exists. Always current (publishing
         // busts the CMS cache), no rebuild involved.
         injectRoute({
-          pattern: '/sitemap.xml',
-          entrypoint: fileURLToPath(new URL('./routes/sitemap.js', import.meta.url)),
+          pattern: "/sitemap.xml",
+          entrypoint: fileURLToPath(
+            new URL("./routes/sitemap.js", import.meta.url),
+          ),
           prerender: false,
         });
+
+        // Dev kit: offline `/dev` gallery + content-type previews, rendered
+        // through the site's own layout and its block/content registry. Dev
+        // only — never injected into a production build, so it cannot ship.
+        // The `arpsw:dev-site` import specifier in the injected routes is
+        // aliased to the site's dev module (which exports blocks/content/Layout).
+        if (command === "dev" && options.devKit) {
+          const devSite = fileURLToPath(new URL(options.devKit, config.root));
+          injectRoute({
+            pattern: "/dev",
+            entrypoint: fileURLToPath(
+              new URL(
+                "../src/components/dev/routes/gallery.astro",
+                import.meta.url,
+              ),
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/content/[type]",
+            entrypoint: fileURLToPath(
+              new URL(
+                "../src/components/dev/routes/content.astro",
+                import.meta.url,
+              ),
+            ),
+            prerender: false,
+          });
+          updateConfig({
+            vite: { resolve: { alias: { "arpsw:dev-site": devSite } } },
+          });
+          logger.info(
+            `dev kit: /dev + /dev/content/[type] (registry from ${options.devKit})`,
+          );
+        }
 
         updateConfig({
           i18n: {
@@ -52,7 +97,7 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
             routing: {
               prefixDefaultLocale: false,
               redirectToDefaultLocale: false,
-              fallbackType: 'redirect',
+              fallbackType: "redirect",
             },
           },
           vite: {
@@ -75,13 +120,13 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
             // Bundle (don't externalize) the package in the SSR build so the
             // `define` above is applied to its runtime; an externalized dep would
             // ship the bare `__ARP_CMS_CONFIG__` reference unreplaced.
-            ssr: { noExternal: ['@arpsw/astro-cms'] },
+            ssr: { noExternal: ["@arpsw/astro-cms"] },
           },
         });
 
         logger.info(
           `serving CMS site "${resolved.cms.site}" · locales [${resolved.locales.join(
-            ', ',
+            ", ",
           )}] · default "${resolved.defaultLocale}"`,
         );
       },

@@ -1,0 +1,17 @@
+---
+/**
+ * Injected by arpCms() at `/dev` in dev only. Renders the site's block registry
+ * through the package gallery, inside the site's own layout. The `arpsw:dev-site`
+ * specifier is aliased by the integration to the site's dev module.
+ */
+export const prerender = false;
+// @ts-expect-error resolved in the consumer via the integration alias
+import { blocks, Layout } from 'arpsw:dev-site';
+import BlockGallery from '../BlockGallery.astro';
+
+const SiteLayout = Layout as any;
+---
+
+<SiteLayout title="Components">
+  <BlockGallery blocks={blocks} />
+</SiteLayout>

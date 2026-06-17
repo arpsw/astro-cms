@@ -22,7 +22,8 @@
   "files": [
     "dist",
     "src/components",
-    "README.md"
+    "README.md",
+    "AGENTS.md"
   ],
   "exports": {
     ".": {
@@ -40,6 +41,10 @@
     "./routes/preview-enter": {
       "types": "./dist/routes/preview-enter.d.ts",
       "import": "./dist/routes/preview-enter.js"
+    },
+    "./dev": {
+      "types": "./dist/dev/registry.d.ts",
+      "import": "./dist/dev/registry.js"
     },
     "./CmsBlock.astro": "./src/components/CmsBlock.astro",
     "./package.json": "./package.json"

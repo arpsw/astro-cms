@@ -1,0 +1,121 @@
+---
+/**
+ * The component showcase: every registered block rendered full width through
+ * the real component, delineated by an overlay (dashed outline + a floating tag
+ * with an info tooltip) that never changes the block's box. Pass the site's
+ * block registry.
+ */
+import type { BlockDefinition } from '@arpsw/astro-cms/dev';
+import Block from './Block.astro';
+
+interface Props {
+  blocks: BlockDefinition[];
+}
+const { blocks } = Astro.props;
+
+const withExamples = blocks.filter((b) => b.examples?.length).length;
+
+type Entry = { block: BlockDefinition; example: { name: string; note?: string } | null };
+const entries: Entry[] = blocks.flatMap((b) => {
+  const exs: ({ name: string; note?: string } | null)[] = b.examples?.length ? [...b.examples] : [null];
+  return exs.map((ex) => ({ block: b, example: ex }));
+});
+---
+
+<div class="gx-intro">
+  <h1>Components</h1>
+  <p>
+    Every block rendered full width, exactly as it ships. The dashed outline and the corner tag
+    are an overlay only, they never change the block. Hover a tag's <span class="gx-i-demo">i</span>
+    for what the block is. {withExamples} of {blocks.length} blocks have fixtures.
+  </p>
+</div>
+
+{
+  entries.map(({ block: b, example: ex }) => (
+    <section class={`gx-block${ex ? '' : ' gx-block--empty'}`}>
+      <div class="gx-tag">
+        <span class="gx-name">{b.title}</span>
+        <code class="gx-type">{b.type}</code>
+        {ex && <span class="gx-variant">{ex.name}</span>}
+        <span class="gx-info" tabindex="0" role="button" aria-label={`About ${b.title}`}>
+          i
+          <span class="gx-tip" role="tooltip">
+            <strong>{b.title}</strong>
+            <span>{b.description ?? 'No description yet.'}</span>
+            <span class="gx-tip-meta">
+              {b.type}
+              {ex?.note ? ` · ${ex.note}` : ''}
+              {!ex ? ' · no fixture yet' : ''}
+            </span>
+          </span>
+        </span>
+      </div>
+
+      {ex ? (
+        <Block definition={b} example={ex.name} />
+      ) : (
+        <div class="gx-empty-body">No fixture yet</div>
+      )}
+    </section>
+  ))
+}
+
+<style>
+  .gx-intro {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 36px 24px 12px;
+  }
+  .gx-intro h1 { font-size: 32px; margin: 0 0 8px; }
+  .gx-intro p { color: var(--logo-gray, #5b6770); max-width: 70ch; line-height: 1.55; }
+  .gx-i-demo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; border: 1px solid currentColor;
+    font-style: italic; font-size: 11px;
+  }
+
+  /* Each block renders at its natural full width. The wrapper adds NO box; only
+     a non-layout-affecting outline (drawn outside the box) delineates it. */
+  .gx-block {
+    position: relative;
+    outline: 1px dashed color-mix(in srgb, var(--ink, #14302b) 14%, transparent);
+    outline-offset: -1px;
+    margin-bottom: 10px;
+  }
+  .gx-block:hover { outline-color: color-mix(in srgb, var(--accent, #c83c00) 70%, transparent); }
+  .gx-block--empty { outline-style: solid; outline-color: color-mix(in srgb, var(--ink, #14302b) 8%, transparent); }
+  .gx-empty-body {
+    padding: 28px 24px; text-align: center; color: var(--logo-gray, #8a938f);
+    font-family: var(--mono, monospace); font-size: 13px;
+  }
+
+  /* Floating tag overlay, top-right. Doesn't affect layout. */
+  .gx-tag {
+    position: absolute; top: 8px; right: 8px; z-index: 30;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: color-mix(in srgb, #14302b 84%, transparent); color: #fff;
+    border-radius: 999px; padding: 4px 6px 4px 11px;
+    font-family: var(--mono, monospace); font-size: 11px; line-height: 1.4;
+    box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+  }
+  .gx-name { font-weight: 700; }
+  .gx-type { opacity: 0.72; }
+  .gx-variant { opacity: 0.55; }
+  .gx-info {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.55);
+    font-style: italic; cursor: help; flex-shrink: 0;
+  }
+  .gx-info:hover, .gx-info:focus-visible { background: rgba(255, 255, 255, 0.18); outline: none; }
+  .gx-tip {
+    position: absolute; top: calc(100% + 8px); right: 0; width: 248px;
+    background: #fff; color: var(--ink, #14302b); border: 1px solid #e6e7e3; border-radius: 10px;
+    box-shadow: 0 14px 36px -12px rgba(14, 42, 51, 0.3);
+    padding: 11px 13px; display: none; flex-direction: column; gap: 5px;
+    text-align: left; font-family: var(--sans, sans-serif); font-size: 12.5px; line-height: 1.45;
+    text-transform: none; letter-spacing: 0;
+  }
+  .gx-info:hover .gx-tip, .gx-info:focus .gx-tip, .gx-info:focus-within .gx-tip { display: flex; }
+  .gx-tip-meta { font-family: var(--mono, monospace); font-size: 11px; color: var(--logo-gray, #8a938f); }
+</style>
