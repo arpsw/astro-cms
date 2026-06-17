@@ -4,6 +4,30 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-17
+
+### Added
+
+- **Dev kit: build and preview blocks, pages, and content types against
+  fixtures, with no CMS running.** One registry is the single source of truth.
+  - `@arpsw/astro-cms/dev` — framework-agnostic registry: `defineBlock`,
+    `defineContentType`, the `DevKitModule` shape, lookups (`findBlock`,
+    `blockExampleData`, `findContentType`, `contentExampleData`), and
+    `describeRegistry()`.
+  - `Block`, `Content`, and the full-width `BlockGallery` components (shipped as
+    source under `src/components/dev`). The gallery delineates each block with an
+    overlay outline + a floating tag whose info tooltip shows the block's
+    description, so the block itself renders untouched at full width.
+  - A `devKit` integration option: the path to the site's dev module (which
+    exports `blocks`, optional `content`, and a `Layout`). In `dev` only, the
+    integration injects `/dev` (the component gallery) and `/dev/content/[type]`
+    (a content type rendered through its real view), both rendered inside the
+    site's own layout via an aliased dev module. Never injected into a
+    production build, so the dev kit cannot ship.
+- **`AGENTS.md` shipped in the package** — conventions for AI coding agents
+  working in an ARP CMS site (how to add a block or content type, the `data`
+  convention, wiring). A site surfaces it with one `@import` in its `CLAUDE.md`.
+
 ## [0.5.0] - 2026-06-10
 
 ### Added
