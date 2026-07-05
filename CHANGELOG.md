@@ -4,6 +4,19 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-06
+
+### Added
+
+- **Edge caching for SSR HTML.** A Workers Cache API middleware
+  (`caches.default`, injected via `addMiddleware`) caches cacheable GET HTML in
+  the Worker, since Cloudflare does not store a Worker's own response. No-ops off
+  Cloudflare and in `astro dev`.
+- **`/api/purge` webhook.** An injected route the CMS calls on publish to
+  invalidate the edge cache: Bearer `PURGE_SECRET`, then the Cloudflare purge API
+  via `CF_ZONE_ID` / `CF_PURGE_TOKEN`. Body `{everything|urls|tags}`. New
+  `./middleware` and `./routes/purge` package exports.
+
 ## [0.6.0] - 2026-06-17
 
 ### Added
