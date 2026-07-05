@@ -24,8 +24,28 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
         command,
         updateConfig,
         injectRoute,
+        addMiddleware,
         logger,
       }) => {
+        // Edge-cache SSR HTML in the Worker. Cloudflare doesn't cache a Worker's
+        // own response (Cache Rules only govern the origin cache), so we do it
+        // with the Workers Cache API. Runs before site middleware so a cache hit
+        // short-circuits rendering; no-ops off Cloudflare (no `caches.default`).
+        addMiddleware({
+          order: "pre",
+          entrypoint: fileURLToPath(new URL("./middleware.js", import.meta.url)),
+        });
+
+        // Cache-purge webhook the CMS calls on publish/menu/global-block/redirect/
+        // settings changes. Reads its secrets (PURGE_SECRET, CF_ZONE_ID,
+        // CF_PURGE_TOKEN) from the Worker env at runtime; 503s until configured.
+        injectRoute({
+          pattern: "/api/purge",
+          entrypoint: fileURLToPath(
+            new URL("./routes/purge.js", import.meta.url),
+          ),
+          prerender: false,
+        });
         // Ship the preview enter-handshake endpoint so every CMS site gets an
         // identical, maintained `/preview/enter` (validate token → set signed
         // cookie → redirect). It's pure logic — no site UI — so it lives here;

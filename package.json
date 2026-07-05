@@ -38,9 +38,17 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
     },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
+    },
     "./routes/preview-enter": {
       "types": "./dist/routes/preview-enter.d.ts",
       "import": "./dist/routes/preview-enter.js"
+    },
+    "./routes/purge": {
+      "types": "./dist/routes/purge.d.ts",
+      "import": "./dist/routes/purge.js"
     },
     "./dev": {
       "types": "./dist/dev/registry.d.ts",
