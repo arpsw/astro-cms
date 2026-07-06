@@ -4,6 +4,15 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-07-06
+
+### Fixed
+
+- **Caching middleware 500 on cache hits.** Serving a `caches.default` response
+  directly threw `Can't modify immutable headers` in Astro's middleware
+  finalizer, turning every cache hit into a 500. The cached response is now
+  rebuilt with a mutable `Headers` copy before it is returned.
+
 ## [0.8.0] - 2026-07-06
 
 ### Added
