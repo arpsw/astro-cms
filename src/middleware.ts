@@ -14,8 +14,16 @@
  * are always bypassed (preview serves drafts + sends `no-store`; `/api/purge`
  * must never be cached). `caches.default` exists only in the Cloudflare runtime,
  * so any other adapter (and `astro dev`) transparently no-ops.
+ *
+ * Cache warming: `/api/purge` re-fetches invalidated URLs with the `x-arp-cache-warm`
+ * header so the edge cache is repopulated before a real visitor arrives. Such a
+ * request skips the cache read (always re-renders) but still stores its result, so
+ * the warmed entry is guaranteed fresh even if the purge hasn't fully propagated.
  */
 import type { MiddlewareHandler } from 'astro';
+
+/** Warm requests (from `/api/purge`) force a fresh render + store, bypassing the read. */
+const WARM_HEADER = 'x-arp-cache-warm';
 
 /** Minimal structural types — avoids depending on ambient CF/DOM lib globals. */
 interface EdgeCache {
@@ -39,17 +47,23 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     return next();
   }
 
-  const hit = await cache.match(request);
-  if (hit) {
-    // A response from `caches.default` has immutable headers. Astro's middleware
-    // finalizer sets headers on whatever a middleware returns, which throws
-    // ("Can't modify immutable headers") on a cached response. Reconstruct it so
-    // the headers are a fresh, mutable copy the finalizer can write to.
-    return new Response(hit.body, {
-      status: hit.status,
-      statusText: hit.statusText,
-      headers: hit.headers,
-    });
+  // A warm request re-renders unconditionally so it overwrites any stale entry;
+  // skip the read but fall through to the store path below.
+  const warm = request.headers.get(WARM_HEADER) === '1';
+
+  if (!warm) {
+    const hit = await cache.match(request);
+    if (hit) {
+      // A response from `caches.default` has immutable headers. Astro's middleware
+      // finalizer sets headers on whatever a middleware returns, which throws
+      // ("Can't modify immutable headers") on a cached response. Reconstruct it so
+      // the headers are a fresh, mutable copy the finalizer can write to.
+      return new Response(hit.body, {
+        status: hit.status,
+        statusText: hit.statusText,
+        headers: hit.headers,
+      });
+    }
   }
 
   const response = await next();
@@ -64,7 +78,11 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     !/no-store|private/.test(cacheControl);
 
   if (storable) {
-    const cfContext = (context.locals as { cfContext?: CfExecutionContext }).cfContext;
+    const locals = context.locals as {
+      cfContext?: CfExecutionContext;
+      runtime?: { ctx?: CfExecutionContext };
+    };
+    const cfContext = locals.cfContext ?? locals.runtime?.ctx;
     // cache.put throws on some non-cacheable responses — swallow so a caching
     // hiccup never breaks the actual page render.
     const put = cache.put(request, response.clone()).catch(() => {});

@@ -4,6 +4,26 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-07-06
+
+### Added
+
+- **Cache warming after a purge.** Once a purge succeeds, `/api/purge` re-fetches
+  the invalidated URLs in the background (`ctx.waitUntil`) with an
+  `x-arp-cache-warm` header, so the edge cache is repopulated before a real
+  visitor arrives. A targeted `{ urls }` purge warms exactly those URLs; a
+  purge-everything (e.g. on deploy) warms the homepage plus up to 30 top pages
+  read from `/sitemap.xml`. A warm request skips the cache read (always
+  re-renders) but still stores its result, so the warmed entry is fresh even if
+  the purge hasn't fully propagated. Warming is per-colo and needs
+  `ctx.waitUntil`, so it no-ops off Cloudflare.
+
+### Changed
+
+- The caching middleware now also sources `ctx.waitUntil` from
+  `locals.runtime.ctx` (the Cloudflare adapter's native location), not only
+  `locals.cfContext`, so background `cache.put` works without extra site wiring.
+
 ## [0.8.1] - 2026-07-06
 
 ### Fixed
