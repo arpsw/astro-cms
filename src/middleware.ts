@@ -41,7 +41,15 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
   const hit = await cache.match(request);
   if (hit) {
-    return hit;
+    // A response from `caches.default` has immutable headers. Astro's middleware
+    // finalizer sets headers on whatever a middleware returns, which throws
+    // ("Can't modify immutable headers") on a cached response. Reconstruct it so
+    // the headers are a fresh, mutable copy the finalizer can write to.
+    return new Response(hit.body, {
+      status: hit.status,
+      statusText: hit.statusText,
+      headers: hit.headers,
+    });
   }
 
   const response = await next();
