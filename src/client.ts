@@ -188,10 +188,14 @@ export async function listPages(
 
 // --- Posts -----------------------------------------------------------------
 
-export async function listPosts(locale: Locale, perPage = 25): Promise<PaginatedResponse<Post>> {
+export async function listPosts(
+  locale: Locale,
+  perPage = 25,
+  page = 1,
+): Promise<PaginatedResponse<Post>> {
   return fetchJson<PaginatedResponse<Post>>('/posts', {
     locale,
-    query: { per_page: perPage },
+    query: { per_page: perPage, page },
   });
 }
 
