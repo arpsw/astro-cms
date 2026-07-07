@@ -146,9 +146,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   // Repopulate the invalidated URLs in the background so visitors hit a warm
-  // cache. Needs ctx.waitUntil (Cloudflare only); no-ops elsewhere.
-  const ctx = (locals as { runtime?: { ctx?: CfExecutionContext }; cfContext?: CfExecutionContext })
-    .runtime?.ctx ?? (locals as { cfContext?: CfExecutionContext }).cfContext;
+  // cache. Needs the CF execution context (Cloudflare only); no-ops elsewhere.
+  // Astro v6 exposes it as `locals.cfContext`; `locals.runtime.ctx` was removed
+  // and now throws, so it must not be touched.
+  const ctx = (locals as { cfContext?: CfExecutionContext }).cfContext;
   let warming = 0;
   let warmTruncated = false;
   if (ctx?.waitUntil) {

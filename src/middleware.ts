@@ -78,11 +78,9 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     !/no-store|private/.test(cacheControl);
 
   if (storable) {
-    const locals = context.locals as {
-      cfContext?: CfExecutionContext;
-      runtime?: { ctx?: CfExecutionContext };
-    };
-    const cfContext = locals.cfContext ?? locals.runtime?.ctx;
+    // Astro v6 exposes the CF execution context as `locals.cfContext`.
+    // `locals.runtime.ctx` was removed and now throws, so it must not be touched.
+    const cfContext = (context.locals as { cfContext?: CfExecutionContext }).cfContext;
     // cache.put throws on some non-cacheable responses — swallow so a caching
     // hiccup never breaks the actual page render.
     const put = cache.put(request, response.clone()).catch(() => {});

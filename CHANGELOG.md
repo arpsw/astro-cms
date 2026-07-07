@@ -4,6 +4,18 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-07-07
+
+### Fixed
+
+- **Purge route threw on Astro v6.** The warming code read `locals.runtime.ctx`,
+  which Astro v6 removed and replaced with a getter that throws
+  (`Astro.locals.runtime.ctx has been removed ... Use 'Astro.locals.cfContext'`).
+  Because it was read before the `cfContext` fallback, every `/api/purge` call
+  errored after purging (so the cache cleared but warming never ran and the
+  webhook returned an error). Both the route and the caching middleware now read
+  `locals.cfContext` only.
+
 ## [0.9.1] - 2026-07-07
 
 ### Changed
