@@ -4,6 +4,31 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-07
+
+### Changed
+
+- **Edge caching moved to Cloudflare Workers Cache.** The in-Worker caching
+  middleware (`caches.default`) and all cache warming are removed. Sites enable
+  `"cache": { "enabled": true }` in their wrangler config instead: Cloudflare
+  caches fetch-handler responses per their `Cache-Control` headers and serves
+  hits without invoking the Worker. The platform cache is tiered across the
+  network (a render anywhere populates the shared upper tier, addressing the
+  per-colo cold-cache problem warming could not fix) and partitioned by Worker
+  version, so every deploy starts from a cold cache and deploy-time purging is
+  unnecessary.
+- **`/api/purge` now purges in-process via `cache.purge()`** from
+  `cloudflare:workers`, instead of calling the zone REST API. `CF_ZONE_ID` and
+  `CF_PURGE_TOKEN` are no longer read or required; only `PURGE_SECRET` (webhook
+  auth) remains. Reported `urls` are purged as path prefixes; `tags` pass
+  through; anything else purges everything. The webhook contract is unchanged,
+  so the CMS needs no changes.
+
+### Removed
+
+- The `./middleware` export (the integration no longer injects any middleware).
+- Cache warming and the `x-arp-cache-warm` header handling.
+
 ## [0.9.3] - 2026-07-07
 
 ### Changed

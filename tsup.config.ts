@@ -5,7 +5,6 @@ export default defineConfig({
     "src/index.ts",
     "src/runtime.ts",
     "src/types.ts",
-    "src/middleware.ts",
     "src/routes/preview-enter.ts",
     "src/routes/sitemap.ts",
     "src/routes/purge.ts",

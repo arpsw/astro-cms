@@ -24,21 +24,18 @@ export function arpCms(options: ArpCmsOptions): AstroIntegration {
         command,
         updateConfig,
         injectRoute,
-        addMiddleware,
         logger,
       }) => {
-        // Edge-cache SSR HTML in the Worker. Cloudflare doesn't cache a Worker's
-        // own response (Cache Rules only govern the origin cache), so we do it
-        // with the Workers Cache API. Runs before site middleware so a cache hit
-        // short-circuits rendering; no-ops off Cloudflare (no `caches.default`).
-        addMiddleware({
-          order: "pre",
-          entrypoint: fileURLToPath(new URL("./middleware.js", import.meta.url)),
-        });
+        // Edge caching of SSR HTML is handled by Cloudflare Workers Cache
+        // ("cache": { "enabled": true } in the site's wrangler config): Cloudflare
+        // caches fetch-handler responses per their Cache-Control headers and
+        // serves hits without invoking the Worker. Tiered across the network and
+        // partitioned by Worker version (deploys start cold), so no in-Worker
+        // cache layer or warming is needed.
 
         // Cache-purge webhook the CMS calls on publish/menu/global-block/redirect/
-        // settings changes. Reads its secrets (PURGE_SECRET, CF_ZONE_ID,
-        // CF_PURGE_TOKEN) from the Worker env at runtime; 503s until configured.
+        // settings changes. Purges the Worker's own cache via cache.purge().
+        // Reads PURGE_SECRET from the Worker env at runtime; 503s until configured.
         injectRoute({
           pattern: "/api/purge",
           entrypoint: fileURLToPath(
