@@ -13,9 +13,11 @@
  * URLs in the background (`ctx.waitUntil`) with the `x-arp-cache-warm` header, so
  * the caching middleware repopulates them before a real visitor arrives:
  *   - a targeted `{ urls }` purge warms exactly those URLs;
- *   - a purge-everything (e.g. on deploy) warms the homepage + top sitemap pages.
- * Warming is per-colo — it warms the data centre the Worker runs in, not every
- * Cloudflare colo — and needs `ctx.waitUntil`, so it no-ops off Cloudflare.
+ *   - a purge-everything (e.g. on deploy) warms every page in `/sitemap.xml`.
+ * URLs are warmed in bounded batches, up to a safety cap (MAX_WARM_URLS); any
+ * overflow self-warms on first visit. Warming is per-colo (it warms the data
+ * centre the Worker runs in, not every Cloudflare colo) and needs
+ * `ctx.waitUntil`, so it no-ops off Cloudflare.
  *
  * Auth: `Authorization: Bearer <PURGE_SECRET>`.
  * Body (all optional): `{ "everything": true }` | `{ "urls": [...] }` | `{ "tags": [...] }`.
@@ -33,8 +35,10 @@ export const prerender = false;
 
 /** Warm request marker honoured by the caching middleware (force fresh render + store). */
 const WARM_HEADER = 'x-arp-cache-warm';
-/** Cap on URLs warmed after a purge — bounds subrequests on a purge-everything. */
-const MAX_WARM_URLS = 30;
+/** Safety backstop on URLs warmed after a purge — bounds subrequests / waitUntil time. */
+const MAX_WARM_URLS = 100;
+/** Warm this many URLs concurrently per batch (bounds simultaneous connections). */
+const WARM_BATCH = 20;
 
 interface CfExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -70,11 +74,11 @@ function safeEqual(a: string, b: string): boolean {
 
 /**
  * URLs to warm after a purge. A targeted `{ urls }` purge warms exactly those;
- * a purge-everything warms the homepage plus the site's top sitemap pages.
+ * a purge-everything warms the homepage plus every page in `/sitemap.xml`.
  */
 async function warmTargets(origin: string, body: PurgeBody): Promise<string[]> {
   if (body.urls?.length) {
-    return [...new Set(body.urls)].slice(0, MAX_WARM_URLS);
+    return [...new Set(body.urls)];
   }
 
   const urls = new Set<string>([`${origin}/`]);
@@ -82,15 +86,20 @@ async function warmTargets(origin: string, body: PurgeBody): Promise<string[]> {
     const res = await fetch(new URL('/sitemap.xml', origin).href);
     if (res.ok) {
       const xml = await res.text();
-      for (const m of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
-        urls.add(m[1]);
-        if (urls.size >= MAX_WARM_URLS) break;
-      }
+      for (const m of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) urls.add(m[1]);
     }
   } catch {
     // No sitemap → just warm the homepage.
   }
-  return [...urls].slice(0, MAX_WARM_URLS);
+  return [...urls];
+}
+
+/** Warm URLs in bounded concurrent batches so the whole set repopulates the cache. */
+async function warmAll(urls: string[]): Promise<void> {
+  for (let i = 0; i < urls.length; i += WARM_BATCH) {
+    const batch = urls.slice(i, i + WARM_BATCH);
+    await Promise.allSettled(batch.map((u) => fetch(u, { headers: { [WARM_HEADER]: '1' } })));
+  }
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -140,16 +149,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
   // cache. Needs ctx.waitUntil (Cloudflare only); no-ops elsewhere.
   const ctx = (locals as { runtime?: { ctx?: CfExecutionContext }; cfContext?: CfExecutionContext })
     .runtime?.ctx ?? (locals as { cfContext?: CfExecutionContext }).cfContext;
-  let warming = false;
+  let warming = 0;
+  let warmTruncated = false;
   if (ctx?.waitUntil) {
-    warming = true;
     const origin = new URL(request.url).origin;
-    ctx.waitUntil(
-      warmTargets(origin, body).then((targets) =>
-        Promise.allSettled(targets.map((u) => fetch(u, { headers: { [WARM_HEADER]: '1' } }))),
-      ),
-    );
+    const found = await warmTargets(origin, body);
+    const targets = found.slice(0, MAX_WARM_URLS);
+    warming = targets.length;
+    warmTruncated = found.length > targets.length;
+    if (warmTruncated) {
+      console.warn(
+        `[purge] warming ${targets.length} of ${found.length} URLs (MAX_WARM_URLS); ` +
+          `the rest self-warm on first visit`,
+      );
+    }
+    ctx.waitUntil(warmAll(targets));
   }
 
-  return json(200, { ok: true, purged: payload, warming });
+  return json(200, { ok: true, purged: payload, warming, warmTruncated });
 };

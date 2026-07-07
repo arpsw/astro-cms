@@ -4,6 +4,16 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-07-07
+
+### Changed
+
+- **Warming now covers the whole site.** A purge-everything re-fetches every page
+  in `/sitemap.xml` (not just the first 30), in bounded concurrent batches, up to
+  a safety cap (`MAX_WARM_URLS`, 100); any overflow self-warms on first visit and
+  is logged. Targeted `{ urls }` purges warm all reported URLs. The purge response
+  now reports `warming` (count scheduled) and `warmTruncated`.
+
 ## [0.9.0] - 2026-07-06
 
 ### Added
