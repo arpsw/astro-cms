@@ -14,8 +14,10 @@
  * the caching middleware repopulates them before a real visitor arrives:
  *   - a targeted `{ urls }` purge warms exactly those URLs;
  *   - a purge-everything (e.g. on deploy) warms every page in `/sitemap.xml`.
- * URLs are warmed in bounded batches, up to a safety cap (MAX_WARM_URLS); any
- * overflow self-warms on first visit. Warming is per-colo (it warms the data
+ * URLs are warmed in one concurrent wave, up to a safety cap (MAX_WARM_URLS).
+ * Warming runs in `ctx.waitUntil`, whose lifetime is bounded, so on a large site
+ * some may not finish; those (and any past the cap) self-warm on first visit.
+ * Warming is per-colo (it warms the data
  * centre the Worker runs in, not every Cloudflare colo) and needs
  * `ctx.waitUntil`, so it no-ops off Cloudflare.
  *
@@ -37,8 +39,6 @@ export const prerender = false;
 const WARM_HEADER = 'x-arp-cache-warm';
 /** Safety backstop on URLs warmed after a purge — bounds subrequests / waitUntil time. */
 const MAX_WARM_URLS = 100;
-/** Warm this many URLs concurrently per batch (bounds simultaneous connections). */
-const WARM_BATCH = 20;
 
 interface CfExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -94,12 +94,14 @@ async function warmTargets(origin: string, body: PurgeBody): Promise<string[]> {
   return [...urls];
 }
 
-/** Warm URLs in bounded concurrent batches so the whole set repopulates the cache. */
+/**
+ * Warm all URLs in a single concurrent wave so they repopulate the cache as fast
+ * as possible. Fired inside `ctx.waitUntil`, which has a bounded lifetime, so a
+ * concurrent wave lets as many as possible finish before the runtime cuts it off;
+ * anything that does not complete self-warms on first visit.
+ */
 async function warmAll(urls: string[]): Promise<void> {
-  for (let i = 0; i < urls.length; i += WARM_BATCH) {
-    const batch = urls.slice(i, i + WARM_BATCH);
-    await Promise.allSettled(batch.map((u) => fetch(u, { headers: { [WARM_HEADER]: '1' } })));
-  }
+  await Promise.allSettled(urls.map((u) => fetch(u, { headers: { [WARM_HEADER]: '1' } })));
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {

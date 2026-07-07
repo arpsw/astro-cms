@@ -4,6 +4,16 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-07-07
+
+### Changed
+
+- **Warm URLs concurrently instead of in sequential batches.** Sequential
+  batching serialized the warm renders, so a full-sitemap warm overran the
+  `ctx.waitUntil` budget and Cloudflare cancelled the leftover tasks. Warming now
+  fires all targets in a single concurrent wave, so as many as possible complete
+  before the budget is reached; the rest self-warm on first visit.
+
 ## [0.9.2] - 2026-07-07
 
 ### Fixed
