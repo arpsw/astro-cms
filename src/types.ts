@@ -48,6 +48,12 @@ export interface Block<T = Record<string, unknown>> {
    * the global block instance. Purely informational for the frontend.
    */
   global?: string;
+  /**
+   * Optional in-page link target: the editor-set anchor slug the CMS lifts
+   * out of `data` at serialization time (no leading `#`). Render it as the
+   * block wrapper's HTML id so `#<anchor>` links jump to the section.
+   */
+  anchor?: string;
 }
 
 /**
