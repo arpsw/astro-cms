@@ -137,27 +137,51 @@ string rewrites, not image processing, so they stay usable in plain markup:
 
 ```astro
 ---
-import { assetSrc, cfImage, cfSrcset } from '@arpsw/astro-cms/runtime';
+import { assetSrc, imageUrl, imageSrcset } from '@arpsw/astro-cms/runtime';
 const src = assetSrc(block.image, 'large');
 ---
 <img
-  src={cfImage(src, { width: 1100 })}
-  srcset={cfSrcset(src, [640, 1100, 1600])}
+  src={imageUrl(src, { width: 1100 })}
+  srcset={imageSrcset(src, [640, 1100, 1600])}
   sizes="(max-width: 768px) 100vw, 1100px"
 />
 ```
 
-Derivatives are produced on the fly by **Cloudflare Image Transformations** via
-`/cdn-cgi/image/<options>/<path>`, built on the **asset's own origin** (the DAM),
-not the site host: transformations run on the zone that serves the URL, so any
-site can embed them as long as the DAM sits behind Cloudflare with
-Transformations on. Every URL carries `onerror=redirect`, so a derivative
-Cloudflare can't produce falls back to the original image instead of erroring.
+`imageUrl` / `imageSrcset` name the **intent**. Which URL scheme they emit is an
+implementation detail chosen by `images.transform`, so a new builder never
+changes a call site. (`cfImage` / `cfSrcset` / `CfImageOptions` still work as
+deprecated aliases; they'll go in 1.0.)
 
-A URL comes back untouched when it can't be transformed: `transform: 'off'`, a
-local host (`localhost`, `127.0.0.1`, `.test`, `.local`), a non-https origin, an
-SVG, an already-transformed URL, or a relative path. `cfSrcset` returns
-`undefined` in those cases, so the caller just omits the attribute.
+With the default `cloudflare` mode, derivatives are produced on the fly by
+**Cloudflare Image Transformations** via `/cdn-cgi/image/<options>/<path>`, built
+on the **asset's own origin** (the DAM), not the site host: transformations run
+on the zone that serves the URL, so any site can embed them as long as the DAM
+sits behind Cloudflare with Transformations on. Every URL carries
+`onerror=redirect`, so a derivative Cloudflare can't produce falls back to the
+original image instead of erroring.
+
+A URL comes back untouched when it can't be transformed: `transform: 'off'`, an
+SVG, a relative path, or anything the active builder declines (for `cloudflare`:
+a local host, a non-https origin, an already-transformed URL). `imageSrcset`
+returns `undefined` in those cases, so the caller just omits the attribute. To
+branch on it yourself, use **`canTransform(src)`** rather than comparing
+`imageUrl()` output against its input.
+
+#### Adding a transform builder
+
+Add the mode to `ImageTransformMode` and an entry to the `BUILDERS` registry in
+`src/media.ts`. The registry is typed `Record<Exclude<ImageTransformMode, 'off'>,
+ImageBuilder>`, so a missing entry is a compile error and the two can't drift.
+
+Put provider-specific preconditions in that builder's `handles()`, **not** in the
+shared prelude. Most of the existing guards are Cloudflare-specific even though
+they read as generic: an Astro `/_image` builder would want local hosts to be the
+*good* case (sharp runs locally), would accept non-https origins, and would
+recognise its own `/_image` prefix. Only "empty", "unparseable" and "SVG" are
+genuinely shared. Note also that `ImageOptions` is Cloudflare-flavoured: the
+`fit` values are CF's vocabulary, and `format: 'auto'` is a CF capability, so
+another builder must map or reject them (Astro's endpoint returns 400 on
+anything outside jpeg/png/gif/webp/avif).
 
 #### Turning transforms off (`images.transform`)
 

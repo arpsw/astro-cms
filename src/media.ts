@@ -9,6 +9,7 @@
  * (never from `astro.config`, which has no `define`) — as it already was.
  */
 import { config } from './config';
+import type { ImageTransformMode } from './options';
 import type { MediaAsset } from './types';
 
 type MaybeAsset = MediaAsset | MediaAsset[] | null | undefined;
@@ -55,31 +56,57 @@ export function assetFocalPosition(m: MaybeAsset): string | undefined {
 // these URLs as long as the DAM sits behind Cloudflare with Transformations on.
 //
 // These are URL rewrites, not image processing. A URL is left untouched when it
-// can't be transformed: transforms disabled via `images.transform: 'off'`, a
-// local dev DAM (no Cloudflare in front), a non-https origin, an SVG (served
-// as-is), an already-transformed URL, or a relative/local asset.
+// can't be transformed: transforms disabled via `images.transform: 'off'`, an
+// SVG (nothing to resize), a relative/local asset, or anything the active
+// builder declines (see `handles` below).
 //
-// Two layers decide whether to rewrite: `images.transform` is the explicit
-// per-environment switch, and `isLocalHost` below is the zero-config fallback so
-// ordinary local development needs no setting. The config is checked first,
-// because a hostname can't tell you whether Cloudflare is actually in front of
-// it — a share tunnel or plain-proxied staging host looks just like production.
+// `imageUrl` / `imageSrcset` name the *intent*; which URL scheme they emit is an
+// implementation detail chosen by `images.transform`. They are deliberately NOT
+// named after a provider, so adding a second builder never touches a call site.
+// `cfImage` / `cfSrcset` remain as deprecated aliases.
+//
+// ── Adding a builder ────────────────────────────────────────────────────────
+// Add the mode to `ImageTransformMode` (in options.ts) and an entry to
+// `BUILDERS`. The `Record<Exclude<ImageTransformMode, 'off'>, …>` type makes a
+// missing entry a compile error, so the two can't drift.
+//
+// Put provider-specific preconditions in that builder's `handles`, NOT in the
+// shared prelude. Most of the guards here are Cloudflare-specific even though
+// they look generic: an Astro `/_image` builder would want local hosts to be the
+// *good* case (sharp runs locally), would accept non-https origins, and would
+// recognise its own `/_image` prefix rather than `/cdn-cgi/`. Only "empty",
+// "unparseable" and "SVG" are genuinely shared.
 
-export interface CfImageOptions {
+export interface ImageOptions {
   width?: number;
   height?: number;
-  /** 1–100; Cloudflare's sweet spot for photos/graphics. Default 80. */
+  /** 1–100. Default 80. */
   quality?: number;
+  /** Cloudflare's vocabulary; another builder may map or ignore these. */
   fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
-  /** `auto` negotiates AVIF/WebP from the Accept header. Default `auto`. */
+  /**
+   * `auto` negotiates AVIF/WebP from the Accept header, which is a Cloudflare
+   * capability: builders without it must pick a concrete format. Default `auto`.
+   */
   format?: 'auto' | 'avif' | 'webp' | 'jpeg' | 'png';
+}
+
+/** @deprecated Renamed to {@link ImageOptions}. */
+export type CfImageOptions = ImageOptions;
+
+interface ImageBuilder {
+  /** Whether this builder can produce a derivative for `url`. */
+  handles(url: URL): boolean;
+  /** Build the derivative URL. Only called when `handles(url)` is true. */
+  build(url: URL, opts: ImageOptions): string;
 }
 
 /**
  * Hosts with no Cloudflare in front — local dev DAMs (Herd `.test`, localhost,
- * loopback). Transform URLs would 404 there, so the helpers pass through. This
- * is what keeps the functions env-independent: dev vs prod is inferred from the
- * asset host, not a build-time flag (the package ships no `import.meta.env`).
+ * loopback). Cloudflare transform URLs would 404 there, so that builder declines
+ * them. This is the zero-config fallback that keeps ordinary local development
+ * working without setting `images.transform` at all; the config is the explicit
+ * switch for hosts this can't classify (a share tunnel looks like production).
  */
 function isLocalHost(host: string): boolean {
   return (
@@ -93,54 +120,86 @@ function isLocalHost(host: string): boolean {
   );
 }
 
-/** Rewrite a CMS media URL to a Cloudflare-transformed derivative. */
-export function cfImage(src: string, opts: CfImageOptions = {}): string {
-  if (!src) return src;
+const BUILDERS: Record<Exclude<ImageTransformMode, 'off'>, ImageBuilder> = {
+  cloudflare: {
+    handles: (url) =>
+      url.protocol === 'https:' && // CF Transformations serve over https
+      !isLocalHost(url.hostname) && // local dev DAM, no Cloudflare in front
+      !url.pathname.startsWith('/cdn-cgi/'), // already transformed
+    build: (url, opts) => {
+      const params = [
+        // Serve the original instead of an error when Cloudflare can't produce
+        // the derivative (unsupported input, size limits). Only applies where
+        // Cloudflare handles the URL; it can't rescue a transform URL that never
+        // reaches Cloudflare at all — that's what `transform: 'off'` is for.
+        'onerror=redirect',
+        opts.width && `width=${opts.width}`,
+        opts.height && `height=${opts.height}`,
+        `quality=${opts.quality ?? 80}`,
+        opts.fit && `fit=${opts.fit}`,
+        `format=${opts.format ?? 'auto'}`,
+      ]
+        .filter(Boolean)
+        .join(',');
 
-  // Explicit per-environment switch; wins over the host heuristic below.
-  if (config.images?.transform === 'off') return src;
+      return `${url.origin}/cdn-cgi/image/${params}${url.pathname}${url.search}`;
+    },
+  },
+};
+
+/** The parsed URL plus the builder that will handle it, or null if none will. */
+function resolveTarget(src: string): { url: URL; builder: ImageBuilder } | null {
+  if (!src) return null;
+
+  const mode = config.images?.transform ?? 'cloudflare';
+  if (mode === 'off') return null;
 
   let url: URL;
   try {
     url = new URL(src);
   } catch {
-    return src; // relative/local asset — nothing to transform
+    return null; // relative/local asset — nothing to transform
   }
 
-  if (url.protocol !== 'https:') return src; // CF Transformations serve over https
-  if (isLocalHost(url.hostname)) return src; // local dev DAM, no Cloudflare
-  if (url.pathname.startsWith('/cdn-cgi/')) return src; // already transformed
-  if (url.pathname.toLowerCase().endsWith('.svg')) return src; // served as-is
+  if (url.pathname.toLowerCase().endsWith('.svg')) return null; // vector, served as-is
 
-  const params = [
-    // Serve the original instead of an error when Cloudflare can't produce the
-    // derivative (unsupported input, size limits). Only applies where Cloudflare
-    // handles the URL; it can't rescue a transform URL that never reaches
-    // Cloudflare at all — that's what `images.transform: 'off'` is for.
-    'onerror=redirect',
-    opts.width && `width=${opts.width}`,
-    opts.height && `height=${opts.height}`,
-    `quality=${opts.quality ?? 80}`,
-    opts.fit && `fit=${opts.fit}`,
-    `format=${opts.format ?? 'auto'}`,
-  ]
-    .filter(Boolean)
-    .join(',');
-
-  return `${url.origin}/cdn-cgi/image/${params}${url.pathname}${url.search}`;
+  const builder = BUILDERS[mode];
+  return builder?.handles(url) ? { url, builder } : null;
 }
 
 /**
- * `srcset` of transformed derivatives at the given widths. Returns undefined
- * when the URL can't be transformed (local DAM, non-https, SVG, relative), so
- * the caller simply omits the attribute.
+ * Whether a derivative would be produced for `src`. Use it to decide whether to
+ * render responsive attributes at all, rather than comparing `imageUrl()` output
+ * against its input.
  */
-export function cfSrcset(
+export function canTransform(src: string): boolean {
+  return resolveTarget(src) !== null;
+}
+
+/**
+ * Rewrite a CMS media URL to a resized derivative, per `images.transform`.
+ * Returns `src` unchanged when no builder applies.
+ */
+export function imageUrl(src: string, opts: ImageOptions = {}): string {
+  const target = resolveTarget(src);
+  return target ? target.builder.build(target.url, opts) : src;
+}
+
+/**
+ * `srcset` of derivatives at the given widths, or undefined when the URL can't
+ * be transformed (or no widths were given) so the caller omits the attribute.
+ */
+export function imageSrcset(
   src: string,
   widths: number[],
-  opts: Omit<CfImageOptions, 'width'> = {},
+  opts: Omit<ImageOptions, 'width'> = {},
 ): string | undefined {
-  const first = cfImage(src, { ...opts, width: widths[0] });
-  if (first === src) return undefined;
-  return widths.map((w) => `${cfImage(src, { ...opts, width: w })} ${w}w`).join(', ');
+  if (!widths.length || !canTransform(src)) return undefined;
+  return widths.map((w) => `${imageUrl(src, { ...opts, width: w })} ${w}w`).join(', ');
 }
+
+/** @deprecated Renamed to {@link imageUrl}. Removed in 1.0. */
+export const cfImage = imageUrl;
+
+/** @deprecated Renamed to {@link imageSrcset}. Removed in 1.0. */
+export const cfSrcset = imageSrcset;

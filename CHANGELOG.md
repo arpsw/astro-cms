@@ -4,6 +4,39 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-07-28
+
+### Added
+
+- **`imageUrl` / `imageSrcset`**, provider-neutral replacements for `cfImage` /
+  `cfSrcset`. The names describe the intent; which URL scheme is emitted is an
+  implementation detail chosen by `images.transform`. The old names were already
+  misleading, since `transform: 'off'` emits no Cloudflare URL at all.
+- **`canTransform(src)`**: whether a derivative would be produced. Use it to
+  decide whether to render responsive attributes, instead of comparing
+  `imageUrl()` output against its input.
+- **`ImageOptions`**, replacing `CfImageOptions`.
+- An internal builder registry keyed by transform mode. Adding a mode to
+  `ImageTransformMode` without a matching builder is now a **compile error**
+  (`Record<Exclude<ImageTransformMode, 'off'>, ImageBuilder>`), so the two can't
+  drift.
+
+### Changed
+
+- Provider-specific preconditions moved out of the shared path into the
+  Cloudflare builder's `handles()`. Most guards were Cloudflare-specific despite
+  looking generic: a future Astro `/_image` builder wants local hosts to be the
+  *good* case (sharp runs locally), accepts non-https origins, and recognises its
+  own prefix. Only "empty", "unparseable" and "SVG" are genuinely shared. Leaving
+  them shared would have silently broken the next builder.
+- `imageSrcset` returns `undefined` for an empty `widths` array (previously an
+  empty string, which is invalid as a `srcset` attribute).
+
+### Deprecated
+
+- `cfImage`, `cfSrcset`, `CfImageOptions`. They remain as aliases with identical
+  behavior and will be removed in 1.0.
+
 ## [0.13.0] - 2026-07-28
 
 ### Added
