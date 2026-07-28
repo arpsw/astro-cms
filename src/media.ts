@@ -1,8 +1,14 @@
 /**
  * Helpers for the CMS media-asset shape. The DAM MediaAssetPicker returns
  * `MediaAsset | MediaAsset[] | null` even for single-select, so these normalise
- * it for block components. Pure functions — no config, importable anywhere.
+ * it for block components.
+ *
+ * The shape helpers (`firstAsset`, `assetSrc`, `assetAlt`, `assetFocalPosition`)
+ * are pure. The transform helpers (`cfImage`, `cfSrcset`) read `images.transform`
+ * from the resolved config, so this module is reachable only through `/runtime`
+ * (never from `astro.config`, which has no `define`) — as it already was.
  */
+import { config } from './config';
 import type { MediaAsset } from './types';
 
 type MaybeAsset = MediaAsset | MediaAsset[] | null | undefined;
@@ -48,10 +54,16 @@ export function assetFocalPosition(m: MaybeAsset): string | undefined {
 // run on the zone that serves the URL, so this stays portable: any site can embed
 // these URLs as long as the DAM sits behind Cloudflare with Transformations on.
 //
-// These are pure URL rewrites (no config, env-independent). A URL is left
-// untouched when it can't be transformed: a local dev DAM (no Cloudflare in
-// front), a non-https origin, an SVG (served as-is), an already-transformed URL,
-// or a relative/local asset.
+// These are URL rewrites, not image processing. A URL is left untouched when it
+// can't be transformed: transforms disabled via `images.transform: 'off'`, a
+// local dev DAM (no Cloudflare in front), a non-https origin, an SVG (served
+// as-is), an already-transformed URL, or a relative/local asset.
+//
+// Two layers decide whether to rewrite: `images.transform` is the explicit
+// per-environment switch, and `isLocalHost` below is the zero-config fallback so
+// ordinary local development needs no setting. The config is checked first,
+// because a hostname can't tell you whether Cloudflare is actually in front of
+// it — a share tunnel or plain-proxied staging host looks just like production.
 
 export interface CfImageOptions {
   width?: number;
@@ -85,6 +97,9 @@ function isLocalHost(host: string): boolean {
 export function cfImage(src: string, opts: CfImageOptions = {}): string {
   if (!src) return src;
 
+  // Explicit per-environment switch; wins over the host heuristic below.
+  if (config.images?.transform === 'off') return src;
+
   let url: URL;
   try {
     url = new URL(src);
@@ -98,6 +113,11 @@ export function cfImage(src: string, opts: CfImageOptions = {}): string {
   if (url.pathname.toLowerCase().endsWith('.svg')) return src; // served as-is
 
   const params = [
+    // Serve the original instead of an error when Cloudflare can't produce the
+    // derivative (unsupported input, size limits). Only applies where Cloudflare
+    // handles the URL; it can't rescue a transform URL that never reaches
+    // Cloudflare at all — that's what `images.transform: 'off'` is for.
+    'onerror=redirect',
     opts.width && `width=${opts.width}`,
     opts.height && `height=${opts.height}`,
     `quality=${opts.quality ?? 80}`,

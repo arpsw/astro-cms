@@ -18,6 +18,24 @@ export interface LocaleMeta {
   dir?: "ltr" | "rtl";
 }
 
+/**
+ * How CMS media URLs are rewritten for delivery by `cfImage` / `cfSrcset`.
+ *
+ * - `cloudflare` — rewrite to Cloudflare's `/cdn-cgi/image/<options>/<path>`
+ *   transform scheme. Requires the asset's own origin (the DAM) to sit behind
+ *   Cloudflare with Image Transformations enabled.
+ * - `off` — leave URLs untouched, so the DAM serves the conversions it already
+ *   stores (thumbnail/medium/large/preview).
+ */
+export type ImageTransformMode = 'cloudflare' | 'off';
+
+const IMAGE_TRANSFORM_MODES: readonly ImageTransformMode[] = ['cloudflare', 'off'];
+
+/** Resolved image-delivery config. */
+export interface ImagesConfig {
+  transform: ImageTransformMode;
+}
+
 /** Edge (Cloudflare) `Cache-Control` headers set by the SSR routes. */
 export interface CacheConfig {
   /** Successful page/post responses. */
@@ -50,6 +68,17 @@ export interface ArpCmsOptions {
   previewCookieTtl?: number;
   /** Per-locale `Cache-Control` overrides; sensible defaults are applied. */
   cache?: Partial<CacheConfig>;
+  /**
+   * Image delivery. Defaults to `{ transform: 'cloudflare' }`, preserving the
+   * `/cdn-cgi/image/` rewrites.
+   *
+   * Set `transform: 'off'` for any environment whose DAM is reachable but *not*
+   * behind Cloudflare (a share tunnel, staging behind a plain proxy). `cfImage`
+   * already passes through obvious local hosts (`localhost`, `.test`, `.local`),
+   * but that heuristic can't recognise a public-looking hostname with no
+   * Cloudflare in front — and a transform URL 404s there.
+   */
+  images?: { transform?: ImageTransformMode };
   /** Per-locale canonical site URLs (no trailing slash); unset → path-prefix routing. */
   websiteUrls?: Record<string, string | undefined>;
   /**
@@ -83,6 +112,7 @@ export interface ResolvedArpCmsConfig {
     cookieTtl: number;
   };
   cache: CacheConfig;
+  images: ImagesConfig;
   websiteUrls: Record<string, string | undefined>;
   contentTypePaths: Record<string, Record<string, string | undefined>>;
   localeMeta: Record<string, LocaleMeta>;
@@ -113,6 +143,19 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
       ? options.defaultLocale
       : fallback;
 
+  // Sites wire this from `.env`, so the value arrives as an unvalidated string.
+  // Fail loudly instead of falling back to `cloudflare`: silently ignoring a
+  // typo would reproduce the exact bug this option exists to prevent (transform
+  // URLs emitted for an origin with no Cloudflare in front).
+  const imageTransform = options.images?.transform ?? 'cloudflare';
+  if (!IMAGE_TRANSFORM_MODES.includes(imageTransform)) {
+    throw new Error(
+      `[@arpsw/astro-cms] \`images.transform\` must be one of ${IMAGE_TRANSFORM_MODES.map(
+        (mode) => `'${mode}'`,
+      ).join(' | ')}; received '${imageTransform}'.`,
+    );
+  }
+
   return {
     cms: {
       baseUrl: trimTrailingSlashes(options.baseUrl),
@@ -127,6 +170,7 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
           : 3600,
     },
     cache: { ...DEFAULT_CACHE, ...options.cache },
+    images: { transform: imageTransform },
     websiteUrls: options.websiteUrls ?? {},
     contentTypePaths: options.contentTypePaths ?? {},
     localeMeta: options.localeMeta ?? {},

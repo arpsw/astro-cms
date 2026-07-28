@@ -130,6 +130,60 @@ const alt = assetAlt(block.image);            // alt → title → ''
 const pos = assetFocalPosition(block.image);  // "50% 30%" for object-position, or undefined
 ```
 
+### Image transforms
+
+`cfImage` / `cfSrcset` rewrite a media URL to a resized derivative. They're
+string rewrites, not image processing, so they stay usable in plain markup:
+
+```astro
+---
+import { assetSrc, cfImage, cfSrcset } from '@arpsw/astro-cms/runtime';
+const src = assetSrc(block.image, 'large');
+---
+<img
+  src={cfImage(src, { width: 1100 })}
+  srcset={cfSrcset(src, [640, 1100, 1600])}
+  sizes="(max-width: 768px) 100vw, 1100px"
+/>
+```
+
+Derivatives are produced on the fly by **Cloudflare Image Transformations** via
+`/cdn-cgi/image/<options>/<path>`, built on the **asset's own origin** (the DAM),
+not the site host: transformations run on the zone that serves the URL, so any
+site can embed them as long as the DAM sits behind Cloudflare with
+Transformations on. Every URL carries `onerror=redirect`, so a derivative
+Cloudflare can't produce falls back to the original image instead of erroring.
+
+A URL comes back untouched when it can't be transformed: `transform: 'off'`, a
+local host (`localhost`, `127.0.0.1`, `.test`, `.local`), a non-https origin, an
+SVG, an already-transformed URL, or a relative path. `cfSrcset` returns
+`undefined` in those cases, so the caller just omits the attribute.
+
+#### Turning transforms off (`images.transform`)
+
+The local-host check is a zero-config convenience for ordinary development. It
+**can't** recognise a public-looking hostname with no Cloudflare in front, such
+as a share tunnel or staging behind a plain proxy: there the transform URL 404s
+while the original loads fine. Set the mode explicitly for those environments:
+
+```ts
+// astro.config.ts
+arpCms({
+  // …
+  images: { transform: env.CMS_IMAGE_TRANSFORM === 'off' ? 'off' : 'cloudflare' },
+});
+```
+
+```dotenv
+# .env — DAM reachable, but not behind Cloudflare
+CMS_IMAGE_TRANSFORM=off
+```
+
+With `'off'` the URLs pass through and the DAM serves the conversions it already
+stores (`thumbnail` / `medium` / `large` / `preview`) — exactly what `assetSrc`
+selects. An unrecognised value **throws** at `astro.config` time rather than
+defaulting, so a typo can't quietly reintroduce broken transform URLs.
+
 **Language switcher** — one entry per configured locale (labels from `localeMeta`):
 
 ```ts
@@ -162,6 +216,7 @@ export const t = makeTranslator({
 | `previewToken` | | — | Bearer for `preview/*`; omit to disable preview |
 | `previewCookieTtl` | | `3600` | Preview-session cookie lifetime (seconds) |
 | `cache` | | sensible defaults | `Cache-Control` overrides (`page`/`notFound`/`error`/`preview`) |
+| `images` | | `{ transform: 'cloudflare' }` | Image delivery; `'off'` disables the `/cdn-cgi/image/` rewrites (see [Image transforms](#image-transforms)) |
 | `websiteUrls` | | `{}` | Per-locale canonical URLs; unset → path-prefix routing |
 | `localeMeta` | | `{}` | Per-locale display data (`code`, `native`, `english?`, `dir?`) for the language switcher + RTL |
 
@@ -252,10 +307,18 @@ npm link @arpsw/astro-cms
 
 ## Publishing
 
-Tag a release; CI (`.github/workflows/release.yml`) builds and publishes to
-GitHub Packages:
+Tag a release; CI (`.github/workflows/release.yml`) builds and publishes to the
+**public npm registry** (per `publishConfig`), using the repo's `NPM_TOKEN`
+secret. Publishing is tag-driven and CI-only: don't run `npm publish` locally.
 
 ```bash
-npm version patch        # bumps package.json + creates the tag
+npm version minor        # or patch/major — bumps package.json + creates the tag
 git push --follow-tags
 ```
+
+Consumers pin caret ranges, and on `0.x` a caret does **not** cross a minor
+(`^0.12.0` won't install `0.13.0`). After releasing, bump each consuming site's
+range *and* its lockfile (`npm install`, then confirm `package-lock.json`
+resolves from `registry.npmjs.org`), or the site keeps building against the old
+version. Known consumers: `arp-projects/arp-software-website` and
+`Sites/arp-agiledrop/astro-website`.

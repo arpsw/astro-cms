@@ -4,6 +4,41 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-07-28
+
+### Added
+
+- **`images.transform` option** (`'cloudflare' | 'off'`, default `'cloudflare'`)
+  to switch off the `/cdn-cgi/image/` rewrites per environment. `cfImage` /
+  `cfSrcset` already passed through obvious local hosts (`localhost`, `.test`,
+  `.local`), but that heuristic cannot recognise a public-looking hostname with
+  no Cloudflare in front (a share tunnel, staging behind a plain proxy): the
+  rewrite was emitted and every image 404'd while the original loaded fine. The
+  config is checked before the host heuristic, which stays as the zero-config
+  fallback so ordinary local development still needs no setting. An
+  unrecognised value throws at `astro.config` time instead of defaulting, since
+  silently ignoring a typo would reproduce the bug the option exists to prevent.
+
+### Changed
+
+- **`cfImage` / `cfSrcset` now emit `onerror=redirect`.** When Cloudflare cannot
+  produce a derivative (unsupported input, size limits) it redirects to the
+  original image instead of returning an error. This changes every generated
+  URL, so the edge cache repopulates on first hit after deploy. It only applies
+  where Cloudflare handles the URL; it cannot rescue a transform URL that never
+  reaches Cloudflare, which is what `images.transform: 'off'` is for.
+- `src/media.ts` now reads the resolved config, so it is reachable only through
+  the `/runtime` entry. It was already exported solely from there.
+
+## [0.12.0] - 2026-07-24
+
+### Added
+
+- **`cfImage` / `cfSrcset`** (`/runtime`): rewrite CMS media URLs to Cloudflare
+  Image Transformation derivatives (`/cdn-cgi/image/<options>/<path>`), built on
+  the asset's own origin so any site can embed them. Pass-through for local
+  hosts, non-https origins, SVGs, already-transformed URLs, and relative paths.
+
 ## [0.11.0] - 2026-07-17
 
 ### Added
