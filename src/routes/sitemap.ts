@@ -58,10 +58,15 @@ export const GET: APIRoute = async () => {
     entries = [];
   }
 
-  // Group translations of the same document for hreflang alternates.
+  // Group translations of the same document for hreflang alternates. The
+  // CMS's translation_group is authoritative (linked siblings keep their own
+  // slugs — /about vs /o-nas); entries without one (older CMS, unbackfilled
+  // rows) fall back to the legacy same-slug heuristic.
   const groups = new Map<string, SitemapEntry[]>();
   for (const entry of entries) {
-    const key = `${entry.type}:${entry.slug}`;
+    const key = entry.translation_group
+      ? `group:${entry.translation_group}`
+      : `${entry.type}:${entry.slug}`;
     const group = groups.get(key);
     if (group) {
       group.push(entry);

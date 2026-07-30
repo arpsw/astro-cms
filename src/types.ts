@@ -76,9 +76,21 @@ export interface GlobalBlockResult {
 }
 
 /**
+ * One language variant of a document: a translation-group member's locale and
+ * its locale-relative logical path (no host, no locale prefix — build the
+ * href with `getLocaleUrl()` / `languageSwitchEntries()`). Emitted by the CMS
+ * on pages, posts and content types, self included.
+ */
+export interface Alternate {
+  locale: Locale;
+  path: string;
+}
+
+/**
  * One row of the `/sitemap` inventory: a published, routable record with its
- * absolute URL and lastmod. Entries sharing `type` + `slug` are the same
- * document in different locales (group them into hreflang alternates).
+ * absolute URL and lastmod. Entries sharing a `translation_group` are the
+ * same document in different locales (group them into hreflang alternates);
+ * entries without one (older CMS rows) fall back to `type` + `slug` grouping.
  */
 export interface SitemapEntry {
   type: string;
@@ -86,6 +98,7 @@ export interface SitemapEntry {
   locale: string;
   path: string;
   url: string;
+  translation_group?: string | null;
   updated_at: string | null;
 }
 
@@ -128,6 +141,10 @@ export interface Page {
   is_homepage: boolean;
   meta: PageMeta;
   blocks: Block[];
+  /** Translation-group id shared by this page's language siblings. */
+  translation_group?: string | null;
+  /** Language variants of this page (self included). */
+  alternates?: Alternate[];
   updated_at: string | null;
 }
 
@@ -164,6 +181,10 @@ export interface Post {
   featured_image: MediaAsset | null;
   author?: { name: string | null; slug: string | null };
   category?: { name: string | null; slug: string | null };
+  /** Translation-group id shared by this post's language siblings. */
+  translation_group?: string | null;
+  /** Language variants of this post (self included). */
+  alternates?: Alternate[];
 }
 
 export interface MenuItem {

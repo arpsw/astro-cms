@@ -6,7 +6,7 @@
  * that's site UI data, owned by the consuming site's language switcher.
  */
 import { config } from './config';
-import type { Locale } from './types';
+import type { Alternate, Locale } from './types';
 
 export function isLocale(value: string | undefined): value is Locale {
   return !!value && config.locales.includes(value);
@@ -156,21 +156,38 @@ export interface LanguageSwitchEntry {
   href: string;
   hreflang: string;
   isActive: boolean;
+  /**
+   * False when `alternates` were provided and this locale has no linked
+   * translation of the current document (the href then falls back to the
+   * locale homepage). Always true in legacy path-mirroring mode.
+   */
+  isTranslated: boolean;
 }
 
 /**
- * One entry per configured locale, each linking to the equivalent path in that
- * locale (host/prefix-aware). Labels come from `localeMeta` (passed to
- * `arpCms({ localeMeta })`); missing metadata falls back to the locale code.
+ * One entry per configured locale. With `alternates` (from `resolveRequest()`
+ * / the resolved document) each entry links the ACTUAL sibling path in that
+ * locale — `/en/about` ↔ `/sl/o-nas` — falling back to the locale homepage
+ * (`isTranslated: false`) when no translation exists. Without `alternates`
+ * (undefined/null) it mirrors the current path into every locale, which is
+ * only correct when translated slugs happen to match — pass alternates
+ * whenever the route has them. Hosts/prefixes and labels resolve exactly as
+ * before (`websiteUrls`, `localeMeta`).
  */
-export function languageSwitchEntries(currentUrl: URL): LanguageSwitchEntry[] {
+export function languageSwitchEntries(
+  currentUrl: URL,
+  alternates?: Alternate[] | null,
+): LanguageSwitchEntry[] {
   const { locale: currentLocale, path: logicalPath } = resolveLocaleAndPath(currentUrl);
 
   return config.locales.map((l) => {
+    const match = alternates?.find((alternate) => alternate.locale === l);
+    const path = alternates != null ? (match?.path ?? '/') : logicalPath;
+
     const site = getLocaleSite(l);
     const href = site
-      ? `${site.origin}${site.pathname.replace(/\/+$/, '')}${logicalPath === '/' ? '' : logicalPath}`
-      : localePath(l, logicalPath);
+      ? `${site.origin}${site.pathname.replace(/\/+$/, '')}${path === '/' ? '' : path}`
+      : localePath(l, path);
     const meta = config.localeMeta[l];
 
     return {
@@ -180,6 +197,7 @@ export function languageSwitchEntries(currentUrl: URL): LanguageSwitchEntry[] {
       href,
       hreflang: l,
       isActive: l === currentLocale,
+      isTranslated: alternates != null ? match !== undefined : true,
     };
   });
 }

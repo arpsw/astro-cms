@@ -10,7 +10,7 @@
 import { config } from './config';
 import { CmsApiError, getMenu, resolvePath, resolvePathPreview } from './client';
 import { resolveLocaleAndPath } from './i18n';
-import type { Locale, Menu, Resolved } from './types';
+import type { Alternate, Locale, Menu, Resolved } from './types';
 
 export interface ResolveRequestOptions {
   /** Hit the preview/draft endpoints (sets no-store + noindex). */
@@ -24,6 +24,13 @@ export interface ResolveRequestResult {
   path: string;
   /** The resolve envelope, or null if the CMS call errored. */
   resolved: Resolved | null;
+  /**
+   * Language variants of the resolved document (self included), hoisted from
+   * `resolved.data.alternates` so consumers stay content-type-blind — pass
+   * straight to `languageSwitchEntries(url, alternates)` and hreflang tags.
+   * Null when nothing resolved or the CMS predates translation groups.
+   */
+  alternates: Alternate[] | null;
   /** The site nav menu (config.cms.menuSlug), or null if unavailable. */
   menu: Menu | null;
   /** Set when the CMS returned a redirect — the caller should `Astro.redirect`. */
@@ -76,6 +83,7 @@ export async function resolveRequest(
       locale,
       path,
       resolved,
+      alternates: null,
       menu: null,
       redirect: { to: resolved.to, code: resolved.code },
       status,
@@ -100,7 +108,29 @@ export async function resolveRequest(
     ctx.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
   }
 
-  return { locale, path, resolved, menu, redirect: null, status, error };
+  return {
+    locale,
+    path,
+    resolved,
+    alternates: alternatesFrom(resolved),
+    menu,
+    redirect: null,
+    status,
+    error,
+  };
+}
+
+/**
+ * Hoist `alternates` off the resolved document, whatever its content type —
+ * page, post, or a module content type (`case_study`, ...). Defensive: an
+ * older CMS without translation groups simply yields null.
+ */
+function alternatesFrom(resolved: Resolved | null): Alternate[] | null {
+  if (!resolved || !('data' in resolved)) return null;
+
+  const alternates = (resolved.data as { alternates?: unknown }).alternates;
+
+  return Array.isArray(alternates) ? (alternates as Alternate[]) : null;
 }
 
 function cacheHeaderFor(
