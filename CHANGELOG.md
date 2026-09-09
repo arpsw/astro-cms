@@ -4,6 +4,36 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-09-09
+
+### Fixed
+
+- **`x-default` is emitted only for a real default-locale sibling.** The sitemap
+  route fell back to the first member of the group (`?? group[0]`), which
+  declared a non-default variant as the page for unmatched languages: a
+  Slovenian page announced as the global fallback, say. Worse, when one document
+  is split across two groups (localised slugs that were never linked) each
+  island declared its own `x-default`, and a conflicting `x-default` makes Google
+  discard the whole cluster. A group with no default-locale member now emits
+  none, on the principle that an incomplete annotation beats a wrong one.
+- **`/sitemap.xml` sends an explicit `Cache-Control`**, the same page policy the
+  integration is configured with, instead of being the one route left to
+  Cloudflare's heuristic TTL. Invalidation is unchanged: the CMS purge webhook
+  drops it on publish.
+
+## [0.15.0] - 2026-08-??
+
+### Added
+
+- **Translation-group-aware hreflang grouping** in the sitemap route, and an
+  alternates-aware language switcher. Locale siblings are grouped by the CMS's
+  `translation_group` so linked documents keep their own localised slugs
+  (`/about-us` and `/o-nas`); entries without a group fall back to the legacy
+  same-slug heuristic.
+
+  Entry backfilled after the fact, from commit `588cf4e`. The release itself was
+  published without one.
+
 ## [0.14.0] - 2026-07-28
 
 ### Added

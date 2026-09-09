@@ -40,10 +40,19 @@ function alternateLinks(group: SitemapEntry[]): string[] {
       `    <xhtml:link rel="alternate" hreflang="${escapeXml(alt.locale)}" href="${escapeXml(alt.url)}" />`,
   );
 
-  const fallback = group.find((alt) => alt.locale === config.defaultLocale) ?? group[0];
-  links.push(
-    `    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(fallback.url)}" />`,
-  );
+  // x-default names the page served to unmatched languages, so it MUST be the
+  // default-locale variant. The old `?? group[0]` emitted whichever member
+  // came first, which told crawlers that e.g. the Slovenian page was the
+  // global fallback. Worse, when one document is split across two groups
+  // (localised slugs that were never linked) each island declared its own
+  // x-default, and conflicting x-default makes Google discard the cluster.
+  // No default-locale sibling means no x-default: incomplete beats wrong.
+  const fallback = group.find((alt) => alt.locale === config.defaultLocale);
+  if (fallback) {
+    links.push(
+      `    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(fallback.url)}" />`,
+    );
+  }
 
   return links;
 }
@@ -98,6 +107,12 @@ export const GET: APIRoute = async () => {
   ].join('\n');
 
   return new Response(xml, {
-    headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    headers: {
+      'Content-Type': 'application/xml; charset=utf-8',
+      // Same contract as pages: the edge holds it, the CMS's purge webhook
+      // drops it on publish. Without an explicit policy this was the one
+      // route left to Cloudflare's heuristic TTL.
+      'Cache-Control': config.cache.page,
+    },
   });
 };
