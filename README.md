@@ -239,6 +239,7 @@ export const t = makeTranslator({
 | `menuSlug` | | `"main"` | Nav menu slug |
 | `previewToken` | | — | Bearer for `preview/*`; omit to disable preview |
 | `previewCookieTtl` | | `3600` | Preview-session cookie lifetime (seconds) |
+| `previewEditorOrigins` | | origin of `baseUrl` | Origins allowed to frame `/preview/*` for click-to-edit (array or comma-separated string) |
 | `cache` | | sensible defaults | `Cache-Control` overrides (`page`/`notFound`/`error`/`preview`) |
 | `images` | | `{ transform: 'cloudflare' }` | Image delivery; `'off'` disables the `/cdn-cgi/image/` rewrites (see [Image transforms](#image-transforms)) |
 | `websiteUrls` | | `{}` | Per-locale canonical URLs; unset → path-prefix routing |
@@ -300,6 +301,72 @@ The cookie carries `<expiryMs>.<hmac>` (HMAC-SHA256 keyed by `previewToken`); th
 expiry is re-checked server-side, so a kept-alive cookie still dies on schedule.
 `secure` is caller-supplied so it sets over http on localhost but is `Secure` in
 prod — derive it from the request protocol as shown.
+
+## Click-to-edit preview (CMS editor iframe)
+
+The CMS editor can embed a preview in an iframe and let editors click a block
+to jump to it in the form (Storyblok-style, refreshed on save rather than
+live). Three pieces, all opt-in:
+
+1. **Auth that survives framing.** Inside a cross-site iframe the preview
+   cookie is a third-party cookie, which `SameSite=Lax` withholds and Safari
+   blocks. So the editor loads `/preview/<path>?arp_preview=<grant>` (the same
+   short-lived grant `/preview/enter` takes), and the route calls
+   `authorizePreview({ url, cookies })`. It accepts the URL token or the
+   cookie, and exchanges a grant for a session value (`urlToken`) that the
+   bridge keeps on the URL, so reloads and navigation stay authorized for
+   `previewCookieTtl`.
+2. **Headers.** `applyPreviewHeaders(Astro.response.headers)` sets no-store,
+   noindex, `frame-ancestors 'self' <previewEditorOrigins>` and
+   `Referrer-Policy: same-origin` (the URL token never leaves the site in a
+   Referer). `resolveRequest(ctx, { preview: true })` applies it for you.
+3. **Markers + bridge.** Wrap each rendered block in
+   `EditableBlock.astro` (a `display: contents` wrapper, so no layout change)
+   and render `PreviewBridge.astro` once on the preview route:
+
+```astro
+---
+import { authorizePreview, applyPreviewHeaders } from '@arpsw/astro-cms/runtime';
+import EditableBlock from '@arpsw/astro-cms/EditableBlock.astro';
+import PreviewBridge from '@arpsw/astro-cms/PreviewBridge.astro';
+
+applyPreviewHeaders(Astro.response.headers);
+const { authorized, urlToken } = await authorizePreview({ url: Astro.url, cookies: Astro.cookies });
+---
+{page.blocks.map((block, index) => (
+  <EditableBlock {block} {index} editable>
+    <Block data={block.data} />
+  </EditableBlock>
+))}
+<PreviewBridge token={urlToken} />
+```
+
+The bridge is inert unless the page is framed. When framed it outlines the
+hovered block, reports clicks to the editor (Alt/Option-click passes through to
+the page, so islands stay usable), rewrites same-site links to stay under
+`/preview` with the token, and obeys editor commands. Messages go only to, and
+are accepted only from, `previewEditorOrigins`.
+
+Protocol (v1). Frame to editor, `{ source: 'arp-preview', version: 1, ... }`:
+
+| `type` | Fields | When |
+|---|---|---|
+| `ready` | `path`, `blocks: [{ uuid, type, index, global }]`, `scrollY` | Page loaded |
+| `scroll` | `scrollY` | The page scrolled (debounced) |
+| `select` | `uuid`, `blockType`, `index`, `global` | Editor clicked a block |
+
+Editor to frame, `{ source: 'arp-cms', ... }`:
+
+| `type` | Fields | Effect |
+|---|---|---|
+| `reload` | | Reload (send after a draft save) |
+| `scroll` | `top` | Jump to a scroll position, instantly. To keep the position across a reload, remember the last `scroll` report and send it back on the next `ready` |
+| `select` | `uuid` (null clears) | Outline the block, scroll it into view |
+| `hover` | `uuid` (null clears) | Outline only (mirror form hover) |
+
+`uuid` is the per-placement block identity the CMS mints and serializes;
+`index` is the fallback for content saved before uuids existed. A `global` slug
+means the block is a shared global block, edited elsewhere.
 
 ## Local development of this package
 

@@ -54,6 +54,12 @@ export interface Block<T = Record<string, unknown>> {
    * block wrapper's HTML id so `#<anchor>` links jump to the section.
    */
   anchor?: string;
+  /**
+   * Stable, server-minted identity of this block within its page (survives
+   * reorders and edits). Used by the preview editor bridge to map a clicked
+   * block back to its CMS form item.
+   */
+  uuid?: string;
 }
 
 /**

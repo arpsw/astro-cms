@@ -10,6 +10,7 @@
 import { config } from './config';
 import { CmsApiError, getMenu, resolvePath, resolvePathPreview } from './client';
 import { resolveLocaleAndPath } from './i18n';
+import { applyPreviewHeaders } from './preview';
 import type { Alternate, Locale, Menu, Resolved } from './types';
 
 export interface ResolveRequestOptions {
@@ -103,9 +104,10 @@ export async function resolveRequest(
   }
   ctx.response.status = status;
 
-  ctx.response.headers.set('Cache-Control', cacheHeaderFor(resolved, error, options.preview));
   if (options.preview) {
-    ctx.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    applyPreviewHeaders(ctx.response.headers);
+  } else {
+    ctx.response.headers.set('Cache-Control', cacheHeaderFor(resolved, error));
   }
 
   return {
@@ -133,12 +135,7 @@ function alternatesFrom(resolved: Resolved | null): Alternate[] | null {
   return Array.isArray(alternates) ? (alternates as Alternate[]) : null;
 }
 
-function cacheHeaderFor(
-  resolved: Resolved | null,
-  error: string | null,
-  preview?: boolean,
-): string {
-  if (preview) return config.cache.preview;
+function cacheHeaderFor(resolved: Resolved | null, error: string | null): string {
   if (error || !resolved) return config.cache.error;
   if (resolved.type === 'page' || resolved.type === 'post') return config.cache.page;
   if (resolved.type === 'not_found') return config.cache.notFound;

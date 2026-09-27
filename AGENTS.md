@@ -98,6 +98,11 @@ package's.
   not hardcode locale prefixes.
 - The footer and nav are CMS-driven on real pages; only the `/static` prototype
   (if a site has one) may hardcode them.
+- Preview routes: gate with `authorizePreview({ url, cookies })` (URL token or
+  cookie), call `applyPreviewHeaders(Astro.response.headers)`, wrap each block
+  in `EditableBlock.astro` with `editable`, and render `PreviewBridge.astro`
+  once with `token={urlToken}`. This powers click-to-edit in the CMS iframe.
+  Never pass `editable` on public routes.
 - Do not commit secrets; CMS connection comes from `.env` via the integration.
 
 ## Surfacing this to the agent

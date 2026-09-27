@@ -4,6 +4,29 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-09-27
+
+### Added
+
+- **Click-to-edit preview for the CMS editor iframe.** `EditableBlock.astro`
+  marks rendered blocks (a `display: contents` wrapper carrying the block's
+  `uuid`, type, index and global slug), and `PreviewBridge.astro` turns a
+  framed `/preview/*` page into a selectable canvas: hover outline, click
+  reports the block to the editor via `postMessage`, and the editor can
+  `reload`, `scroll`, `select` and `hover` blocks. The frame reports its
+  scroll position (`scroll`) so the editor can restore it after a reload.
+  Inert outside an iframe.
+  See "Click-to-edit preview" in the README for the protocol.
+- **`authorizePreview({ url, cookies })`**: authorizes a preview request from
+  the `arp_preview` URL token (a CMS grant, exchanged for a session value, or
+  an existing session value) or the preview cookie. Framed previews need this
+  because the cookie is third-party inside the CMS iframe.
+- **`applyPreviewHeaders(headers)`**: no-store, noindex,
+  `frame-ancestors 'self' <previewEditorOrigins>` and
+  `Referrer-Policy: same-origin`. `resolveRequest` uses it for previews.
+- **`previewEditorOrigins` option** (default: the origin of `baseUrl`).
+- **`Block.uuid`** in the API types.
+
 ## [0.15.1] - 2026-09-09
 
 ### Fixed

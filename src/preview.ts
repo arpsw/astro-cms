@@ -161,3 +161,70 @@ export function previewCookieOptions(secure: boolean, maxAge: number): PreviewCo
     maxAge,
   };
 }
+
+/**
+ * Query parameter carrying preview authorization on the URL, for when the
+ * preview is embedded in the CMS editor's iframe. There the session cookie is
+ * a third-party cookie (the admin and the site are different sites), which
+ * `SameSite=Lax` withholds and Safari blocks outright, so the frame carries
+ * its authorization in the URL instead (the same approach Storyblok's
+ * `_storyblok_tk` takes).
+ */
+export const PREVIEW_QUERY_PARAM = 'arp_preview';
+
+export interface PreviewAccess {
+  /** True when the request may see draft content. */
+  authorized: boolean;
+  /**
+   * Set when access came from the URL (the embedded editor): a signed session
+   * value the page should keep on its URL, so reloads and in-preview
+   * navigation stay authorized after the short-lived grant has expired. The
+   * editor bridge (`PreviewBridge.astro`) swaps it in with `history.replaceState`.
+   */
+  urlToken: string | null;
+}
+
+interface PreviewAccessContext {
+  url: URL;
+  cookies: { get(name: string): { value: string } | undefined };
+}
+
+/**
+ * Decide whether a `/preview/*` request is authorized, from either source:
+ *
+ * 1. `?arp_preview=<grant | session>` (embedded editor): a CMS-minted grant is
+ *    exchanged for a fresh session value; an existing session value is reused.
+ *    Either way the value comes back as `urlToken`.
+ * 2. The `arp_cms_preview` cookie set by `/preview/enter` (a normal tab).
+ */
+export async function authorizePreview(ctx: PreviewAccessContext): Promise<PreviewAccess> {
+  const fromUrl = ctx.url.searchParams.get(PREVIEW_QUERY_PARAM);
+  if (fromUrl) {
+    if (await verifyPreviewSession(fromUrl)) {
+      return { authorized: true, urlToken: fromUrl };
+    }
+    if (await verifyPreviewGrant(fromUrl)) {
+      const session = await createPreviewSession();
+      return { authorized: true, urlToken: session.value };
+    }
+  }
+
+  const authorized = await verifyPreviewSession(ctx.cookies.get(PREVIEW_COOKIE_NAME)?.value);
+  return { authorized, urlToken: null };
+}
+
+/**
+ * Response headers every `/preview/*` response should carry: never cached,
+ * never indexed, frameable only by the site itself and the configured editor
+ * origins (`previewEditorOrigins`), and no Referer leaving the site (a URL
+ * token must not leak to third-party assets).
+ */
+export function applyPreviewHeaders(headers: Headers): void {
+  headers.set('Cache-Control', config.cache.preview);
+  headers.set('X-Robots-Tag', 'noindex, nofollow');
+  headers.set(
+    'Content-Security-Policy',
+    `frame-ancestors ${["'self'", ...config.preview.editorOrigins].join(' ')}`,
+  );
+  headers.set('Referrer-Policy', 'same-origin');
+}

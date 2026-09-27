@@ -1,0 +1,39 @@
+---
+/**
+ * Marks one rendered block for the preview editor bridge (see
+ * `PreviewBridge.astro`). With `editable` it wraps the slot in a
+ * `display: contents` element carrying the block's identity, so it adds no box
+ * and leaves the layout exactly as on the live site; without it the slot
+ * renders untouched. Sites wrap each block in their renderer:
+ *
+ *   import EditableBlock from '@arpsw/astro-cms/EditableBlock.astro';
+ *   <EditableBlock {block} {index} {editable}><Component data={block.data} /></EditableBlock>
+ */
+import type { Block } from '../types';
+
+interface Props {
+  block: Block;
+  /** Position in the page's block list: the fallback identity when `uuid` is missing. */
+  index?: number;
+  /** Emit the marker. Pass true only on preview routes. */
+  editable?: boolean;
+}
+
+const { block, index, editable = false } = Astro.props;
+---
+
+{
+  editable ? (
+    <div
+      data-arp-block={block.uuid ?? ''}
+      data-arp-block-type={block.type}
+      data-arp-block-index={index}
+      data-arp-block-global={block.global}
+      style="display: contents"
+    >
+      <slot />
+    </div>
+  ) : (
+    <slot />
+  )
+}

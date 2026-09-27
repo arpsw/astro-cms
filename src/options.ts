@@ -66,6 +66,13 @@ export interface ArpCmsOptions {
    * enter-preview handshake. Defaults to 3600 (1 hour).
    */
   previewCookieTtl?: number;
+  /**
+   * Origins allowed to embed `/preview/*` in an iframe and exchange
+   * click-to-edit messages with it (the CMS admin). Accepts an array or a
+   * comma-separated string (handy from `.env`). Defaults to the origin of
+   * `baseUrl`, since the admin normally runs on the same host as the API.
+   */
+  previewEditorOrigins?: readonly string[] | string;
   /** Per-locale `Cache-Control` overrides; sensible defaults are applied. */
   cache?: Partial<CacheConfig>;
   /**
@@ -110,6 +117,8 @@ export interface ResolvedArpCmsConfig {
   preview: {
     /** Signed preview-cookie lifetime in seconds. */
     cookieTtl: number;
+    /** Origins allowed to frame `/preview/*` and talk to its editor bridge. */
+    editorOrigins: string[];
   };
   cache: CacheConfig;
   images: ImagesConfig;
@@ -168,6 +177,7 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
         options.previewCookieTtl && options.previewCookieTtl > 0
           ? Math.floor(options.previewCookieTtl)
           : 3600,
+      editorOrigins: resolveEditorOrigins(options.previewEditorOrigins, options.baseUrl),
     },
     cache: { ...DEFAULT_CACHE, ...options.cache },
     images: { transform: imageTransform },
@@ -177,4 +187,36 @@ export function resolveOptions(options: ArpCmsOptions): ResolvedArpCmsConfig {
     locales: [...options.locales],
     defaultLocale,
   };
+}
+
+/**
+ * Normalise the editor origins to bare `scheme://host[:port]` values. Invalid
+ * entries fail the build: a typo here would silently break embedding (the
+ * browser refuses the frame) or, worse, widen it.
+ */
+function resolveEditorOrigins(
+  value: readonly string[] | string | undefined,
+  baseUrl: string,
+): string[] {
+  const raw =
+    value === undefined || value === ''
+      ? [baseUrl]
+      : typeof value === 'string'
+        ? value.split(',')
+        : [...value];
+
+  const origins = raw
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '')
+    .map((entry) => {
+      try {
+        return new URL(entry).origin;
+      } catch {
+        throw new Error(
+          `[@arpsw/astro-cms] \`previewEditorOrigins\` entry '${entry}' is not a valid URL/origin.`,
+        );
+      }
+    });
+
+  return [...new Set(origins)];
 }

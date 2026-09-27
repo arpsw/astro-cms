@@ -1,0 +1,235 @@
+---
+/**
+ * Click-to-edit bridge between a `/preview/*` page and the CMS editor that
+ * embeds it in an iframe. Render it once on the preview route (anywhere in the
+ * page). It stays inert unless the page is actually framed, so a preview
+ * opened in a normal tab behaves as before.
+ *
+ * While framed it:
+ * - outlines the block under the pointer (blocks are marked by
+ *   `EditableBlock.astro`) and, on click, tells the editor which block was
+ *   picked. Alt/Option-click passes through, so islands stay usable;
+ * - keeps the URL preview token (`urlToken` from `authorizePreview`) on the
+ *   address and on same-site links, so reloads and navigation stay in preview;
+ * - reports its scroll position, and obeys editor commands: reload, scroll,
+ *   select, hover. The editor owns scroll restoration across reloads (it
+ *   remembers the last reported position and sends it back after `ready`),
+ *   so nothing depends on storage or unload timing inside the frame.
+ *
+ * Messages are only sent to, and accepted from, `previewEditorOrigins`.
+ *
+ * Protocol (v1). Frame to editor, `{ source: 'arp-preview', version: 1, ... }`:
+ *   { type: 'ready', path, blocks: [{ uuid, type, index, global }], scrollY }
+ *   { type: 'scroll', scrollY }     debounced while the page scrolls
+ *   { type: 'select', uuid, blockType, index, global }
+ * Editor to frame, `{ source: 'arp-cms', ... }`:
+ *   { type: 'reload' }
+ *   { type: 'scroll', top }         jump there instantly (restore after reload)
+ *   { type: 'select', uuid }        outline + scroll into view; null clears
+ *   { type: 'hover', uuid }         outline only; null clears
+ */
+import { config, PREVIEW_QUERY_PARAM } from '@arpsw/astro-cms/runtime';
+
+interface Props {
+  /** `authorizePreview(...).urlToken`: kept on the URL while framed. */
+  token?: string | null;
+}
+
+const { token = null } = Astro.props;
+const origins = config.preview.editorOrigins;
+const param = PREVIEW_QUERY_PARAM;
+---
+
+<script is:inline define:vars={{ origins, token, param }}>
+  (() => {
+    if (window.parent === window) return;
+
+    const SOURCE = 'arp-preview';
+    const COLOR = '#2563eb';
+    let editorOrigin = null;
+    let selected = null;
+    let hovered = null;
+
+    const post = (message) => {
+      const payload = { source: SOURCE, version: 1, ...message };
+      // A non-matching targetOrigin is dropped by the browser, so until the
+      // editor has identified itself every allowed origin is addressed.
+      for (const origin of editorOrigin ? [editorOrigin] : origins) {
+        window.parent.postMessage(payload, origin);
+      }
+    };
+
+    // Keep authorization on the URL: the grant the editor sent is exchanged
+    // server-side for a longer-lived session value, swapped in here.
+    const withToken = (href) => {
+      const url = new URL(href, location.href);
+      if (token) url.searchParams.set(param, token);
+      return url;
+    };
+    if (token && new URL(location.href).searchParams.get(param) !== token) {
+      history.replaceState(history.state, '', withToken(location.href));
+    }
+
+    const blockOf = (el) => (el instanceof Element ? el.closest('[data-arp-block]') : null);
+    const describe = (block) => ({
+      uuid: block.dataset.arpBlock || null,
+      type: block.dataset.arpBlockType,
+      index: block.dataset.arpBlockIndex === undefined ? null : Number(block.dataset.arpBlockIndex),
+      global: block.dataset.arpBlockGlobal || null,
+    });
+    const findBlock = (uuid) =>
+      uuid ? document.querySelector(`[data-arp-block="${CSS.escape(uuid)}"]`) : null;
+
+    // Markers are `display: contents` (no box), so a block's area is the
+    // union of its rendered descendants' boxes.
+    const rectOf = (el) => {
+      let top = Infinity, left = Infinity, bottom = -Infinity, right = -Infinity;
+      const visit = (node) => {
+        for (const child of node.children) {
+          const r = child.getBoundingClientRect();
+          if (r.width === 0 && r.height === 0) {
+            visit(child);
+            continue;
+          }
+          top = Math.min(top, r.top);
+          left = Math.min(left, r.left);
+          bottom = Math.max(bottom, r.bottom);
+          right = Math.max(right, r.right);
+        }
+      };
+      visit(el);
+      return top === Infinity ? null : { top, left, width: right - left, height: bottom - top };
+    };
+
+    const makeOutline = (style) => {
+      const box = document.createElement('div');
+      box.setAttribute('aria-hidden', 'true');
+      box.style.cssText = `position:fixed;pointer-events:none;z-index:2147483646;display:none;box-sizing:border-box;${style}`;
+      const label = document.createElement('span');
+      label.style.cssText = `position:absolute;top:0;left:0;padding:2px 8px;background:${COLOR};color:#fff;font:600 11px/1.6 system-ui,sans-serif;letter-spacing:.02em;white-space:nowrap;border-bottom-right-radius:4px`;
+      box.append(label);
+      document.body.append(box);
+      return { box, label };
+    };
+    const hoverBox = makeOutline(`outline:2px dashed ${COLOR};outline-offset:-2px`);
+    const selectBox = makeOutline(`outline:3px solid ${COLOR};outline-offset:-3px`);
+
+    const place = ({ box, label }, block) => {
+      const rect = block && rectOf(block);
+      if (!rect) {
+        box.style.display = 'none';
+        return;
+      }
+      const { type, global } = describe(block);
+      label.textContent = global ? `${type} · global: ${global}` : type;
+      Object.assign(box.style, {
+        display: 'block',
+        top: `${rect.top}px`,
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+      });
+    };
+    const render = () => {
+      place(selectBox, selected);
+      place(hoverBox, hovered && hovered !== selected ? hovered : null);
+    };
+    addEventListener('scroll', render, { passive: true, capture: true });
+    addEventListener('resize', render);
+
+    const select = (block, scroll) => {
+      selected = block;
+      render();
+      if (!block || !scroll) return;
+      const rect = rectOf(block);
+      if (rect && (rect.top < 0 || rect.top > innerHeight * 0.6)) {
+        scrollTo({ top: scrollY + rect.top - 80, behavior: 'smooth' });
+      }
+    };
+
+    document.addEventListener('mouseover', (event) => {
+      hovered = blockOf(event.target);
+      render();
+    });
+    document.documentElement.addEventListener('mouseleave', () => {
+      hovered = null;
+      render();
+    });
+
+    document.addEventListener(
+      'click',
+      (event) => {
+        const block = blockOf(event.target);
+        if (block && !event.altKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          select(block, false);
+          const { type, ...rest } = describe(block);
+          post({ type: 'select', blockType: type, ...rest });
+          return;
+        }
+
+        // Plain same-site links stay inside preview: prefix /preview and
+        // carry the token (the nav and footer link to public URLs).
+        const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+        if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+        const url = new URL(link.href, location.href);
+        if (url.origin !== location.origin) return;
+        if (url.pathname === location.pathname && url.hash) return;
+        if (!url.pathname.startsWith('/preview')) {
+          url.pathname = url.pathname === '/' ? '/preview' : `/preview${url.pathname}`;
+        }
+        event.preventDefault();
+        location.assign(withToken(url.href));
+      },
+      true,
+    );
+
+    addEventListener('message', (event) => {
+      if (!origins.includes(event.origin)) return;
+      const message = event.data;
+      if (!message || message.source !== 'arp-cms') return;
+      editorOrigin = event.origin;
+
+      if (message.type === 'reload') {
+        location.reload();
+      } else if (message.type === 'scroll' && Number.isFinite(message.top)) {
+        scrollToInstantly(message.top);
+      } else if (message.type === 'select') {
+        select(findBlock(message.uuid), true);
+      } else if (message.type === 'hover') {
+        hovered = findBlock(message.uuid);
+        render();
+      }
+    });
+
+    // Instant, not the site's `scroll-behavior: smooth` (which would animate
+    // from the top), and re-applied once for layout that settles late
+    // (fonts, images, islands).
+    const scrollToInstantly = (top) => {
+      const jump = () => scrollTo({ top, behavior: 'instant' });
+      jump();
+      setTimeout(jump, 150);
+    };
+
+    let scrollTimer = null;
+    addEventListener(
+      'scroll',
+      () => {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => post({ type: 'scroll', scrollY: Math.round(scrollY) }), 120);
+      },
+      { passive: true },
+    );
+
+    const announce = () =>
+      post({
+        type: 'ready',
+        path: location.pathname,
+        blocks: [...document.querySelectorAll('[data-arp-block]')].map(describe),
+        scrollY: Math.round(scrollY),
+      });
+    if (document.readyState === 'complete') announce();
+    else addEventListener('load', announce);
+  })();
+</script>
