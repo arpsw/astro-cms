@@ -4,6 +4,14 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`Post.faq`.** Posts carry their FAQ as `faq: FaqItem[]` (`{ question, answer }`),
+  empty when the post has none. Requires the CMS post FAQ release; optional in the
+  type so older CMS versions still type-check.
+
 ## [0.16.0] - 2026-09-27
 
 ### Added

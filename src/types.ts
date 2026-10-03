@@ -191,6 +191,16 @@ export interface Post {
   translation_group?: string | null;
   /** Language variants of this post (self included). */
   alternates?: Alternate[];
+  /**
+   * FAQ entries edited in the CMS (form or AI tools); empty when none.
+   * Optional so older CMS versions without the field still type-check.
+   */
+  faq?: FaqItem[];
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string;
 }
 
 export interface MenuItem {
