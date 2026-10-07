@@ -8,7 +8,7 @@
  * there); the define is only applied to the app/runtime build.
  */
 import { config } from './config';
-import { CmsApiError, getMenu, resolvePath, resolvePathPreview } from './client';
+import { CmsApiError, getConfig, getMenu, resolvePath, resolvePathPreview } from './client';
 import { resolveLocaleAndPath } from './i18n';
 import { applyPreviewHeaders } from './preview';
 import type { Alternate, Locale, Menu, Resolved } from './types';
@@ -92,12 +92,12 @@ export async function resolveRequest(
     };
   }
 
-  let menu: Menu | null = null;
-  try {
-    menu = await getMenu(config.cms.menuSlug, locale);
-  } catch {
-    // Non-fatal — render without a nav menu.
-  }
+  // The site config is fetched for its side effect: it records the CMS
+  // content-type prefixes that `contentTypePath()` builds links from.
+  const [menu] = await Promise.all([
+    getMenu(config.cms.menuSlug, locale).catch((): Menu | null => null),
+    getConfig().catch(() => null),
+  ]);
 
   if (resolved?.type === 'not_found') {
     status = 404;

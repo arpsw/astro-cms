@@ -6,6 +6,7 @@
  * that's site UI data, owned by the consuming site's language switcher.
  */
 import { config } from './config';
+import { liveContentTypePaths } from './live-config';
 import type { Alternate, Locale } from './types';
 
 export function isLocale(value: string | undefined): value is Locale {
@@ -51,12 +52,17 @@ export function getLocaleUrl(locale: Locale, path: string = '/'): string {
 }
 
 /**
- * URL prefix configured for a content type in a locale (e.g. `post` → `blog`),
- * from `config.contentTypePaths` (Site settings → `/config` `content_type_paths`).
- * Returns undefined when unset — Page has no prefix (it lives at the site root).
+ * URL prefix configured for a content type in a locale (e.g. `post` → `blog`).
+ * The CMS Site settings (`/config` `content_type_paths`, recorded by
+ * `getConfig()`, which `resolveRequest()` calls) are the source of truth; the
+ * `contentTypePaths` integration option is only the fallback for when the CMS
+ * config hasn't been fetched (offline dev kit, CMS down). Returns undefined when
+ * unset — Page has no prefix (it lives at the site root).
  */
 export function contentTypePath(type: string, locale: Locale): string | undefined {
-  return config.contentTypePaths[type]?.[locale] ?? undefined;
+  return (
+    liveContentTypePaths()?.[type]?.[locale] || config.contentTypePaths[type]?.[locale] || undefined
+  );
 }
 
 /**

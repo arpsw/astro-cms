@@ -4,6 +4,7 @@
  * `/api/cms/v1/sites/{site}`.
  */
 import { config } from './config';
+import { recordSiteConfig } from './live-config';
 import type {
   GlobalBlockResult,
   Locale,
@@ -217,7 +218,9 @@ export async function getMenu(slug: string, locale: Locale): Promise<Menu> {
  * without a rebuild, e.g. the per-locale custom scripts the layout injects.
  */
 export async function getConfig(): Promise<SiteConfig> {
-  return fetchJson<SiteConfig>('/config');
+  const siteConfig = await fetchJson<SiteConfig>('/config');
+  recordSiteConfig(siteConfig);
+  return siteConfig;
 }
 
 // --- Sitemap inventory --------------------------------------------------------

@@ -12,6 +12,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   empty when the post has none. Requires the CMS post FAQ release; optional in the
   type so older CMS versions still type-check.
 
+### Fixed
+
+- **`contentTypePath()` follows the CMS Site settings.** `resolveRequest()` now
+  fetches `/config` alongside the menu, and `contentTypePath()` reads that
+  `content_type_paths` first. The `contentTypePaths` integration option is only a
+  fallback (offline dev kit, CMS unreachable). Previously links were built from the
+  hardcoded option alone, so a prefix changed in the CMS, or a locale missing from
+  the option, produced post links the CMS could not resolve (404).
+
 ## [0.16.0] - 2026-09-27
 
 ### Added
