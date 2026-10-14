@@ -30,10 +30,10 @@ export function assetSrc(
   return (a[size] as string | null | undefined) ?? a.url ?? undefined;
 }
 
-/** Alt text, falling back to the asset title then empty string. */
+/** The per-use alt text, or empty string. Never the asset title: a title does not describe the image. */
 export function assetAlt(m: MaybeAsset): string {
   const a = firstAsset(m);
-  return a?.alt ?? a?.title ?? '';
+  return a?.alt ?? '';
 }
 
 /**

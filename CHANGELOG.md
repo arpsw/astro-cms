@@ -4,6 +4,14 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`assetAlt()` no longer falls back to the asset title.** It returns the per-use
+  alt text or `''`. A title is not a description of the image, and a silent
+  fallback hides images nobody described.
+
 ## [0.17.0] - 2026-10-07
 
 ### Added

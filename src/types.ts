@@ -14,7 +14,7 @@ export interface MediaAsset {
   type?: string | null;
   title?: string | null;
   caption?: string | null;
-  /** Per-use alt (from media_asset_options.alt_text), falls back to title. */
+  /** Per-use alt (from dam_asset_options.alt_text); null when none was written. No fallback. */
   alt?: string | null;
   url: string | null;
   thumbnail?: string | null;
