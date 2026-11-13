@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`transformHtmlImages(html, opts)`.** Rewrites the `<img>` tags in CMS rich
+  text (post bodies, content blocks) to resized derivatives with `srcset`, `sizes`,
+  `loading="lazy"` and `decoding="async"`, the way `imageUrl()` / `imageSrcset()`
+  already serve block images. The editor stores the original upload URL, so inline
+  images shipped at full size (a 1.3 MB JPEG where the 800px AVIF is 27 KB).
+  Untransformable images, images with an existing `srcset`, and attributes the
+  editor set are left alone.
+
 ### Fixed
 
 - **`/sitemap.xml` URLs match the page's own hreflang and canonical.** `<loc>` and

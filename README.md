@@ -167,6 +167,19 @@ returns `undefined` in those cases, so the caller just omits the attribute. To
 branch on it yourself, use **`canTransform(src)`** rather than comparing
 `imageUrl()` output against its input.
 
+Rich text (post bodies, content blocks) carries inline images as plain `<img>`
+tags pointing at the original upload. Run that HTML through
+**`transformHtmlImages(html, { sizes })`** before `set:html` so those images get
+the same derivatives and `srcset` as block images:
+
+```astro
+<div class="prose" set:html={transformHtmlImages(post.body, { sizes: '(min-width: 800px) 720px, 100vw' })} />
+```
+
+It leaves untransformable images and any `<img>` that already has a `srcset`
+alone, keeps every other attribute, and only adds `sizes`, `loading="lazy"` and
+`decoding="async"` when the editor didn't set them.
+
 #### Adding a transform builder
 
 Add the mode to `ImageTransformMode` and an entry to the `BUILDERS` registry in

@@ -4,7 +4,8 @@
  * it for block components.
  *
  * The shape helpers (`firstAsset`, `assetSrc`, `assetAlt`, `assetFocalPosition`)
- * are pure. The transform helpers (`cfImage`, `cfSrcset`) read `images.transform`
+ * are pure. The transform helpers (`imageUrl`, `imageSrcset`, `transformHtmlImages`)
+ * read `images.transform`
  * from the resolved config, so this module is reachable only through `/runtime`
  * (never from `astro.config`, which has no `define`) — as it already was.
  */
@@ -196,6 +197,88 @@ export function imageSrcset(
 ): string | undefined {
   if (!widths.length || !canTransform(src)) return undefined;
   return widths.map((w) => `${imageUrl(src, { ...opts, width: w })} ${w}w`).join(', ');
+}
+
+export interface HtmlImageOptions extends Omit<ImageOptions, 'width'> {
+  /** Widths for the generated `srcset`. Default `[480, 800, 1200, 1600]`. */
+  widths?: number[];
+  /**
+   * Width of the fallback `src` (browsers without srcset support, crawlers).
+   * Default: the largest of `widths`.
+   */
+  width?: number;
+  /**
+   * `sizes` for the generated `srcset`: how wide the image renders, which is
+   * the site's layout knowledge. Default `100vw` (correct but wasteful in a
+   * narrow column, so pass the real value, e.g. `(min-width: 800px) 720px, 100vw`).
+   */
+  sizes?: string;
+}
+
+const IMG_TAG = /<img\b[^>]*>/gi;
+const ATTR = /\s([^\s=/>]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+
+function decodeAttr(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function encodeAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Rewrite every `<img>` in CMS rich-text HTML (post bodies, content blocks) to
+ * a resized derivative, the way block components use {@link imageUrl} and
+ * {@link imageSrcset} for picker images. The editor stores the asset's
+ * original URL, so without this an inline image ships at upload size (often
+ * megabytes) while every block image is resized and recompressed.
+ *
+ * Per image: `src` becomes a derivative at `width`, and `srcset`, `sizes`,
+ * `loading="lazy"` and `decoding="async"` are added unless the editor already
+ * set them. Images that can't be transformed (see {@link canTransform}) and
+ * images that already carry a `srcset` are left exactly as they are; every
+ * other attribute is preserved.
+ */
+export function transformHtmlImages(html: string, opts: HtmlImageOptions = {}): string {
+  if (!html || !html.includes('<img')) return html;
+
+  const { widths = [480, 800, 1200, 1600], width, sizes = '100vw', ...imageOpts } = opts;
+  const fallbackWidth = width ?? Math.max(...widths);
+
+  return html.replace(IMG_TAG, (tag) => {
+    const attrs = new Map<string, string>();
+    for (const [, name, raw] of tag.matchAll(ATTR)) {
+      const value = raw === undefined ? '' : raw.replace(/^(["'])([\s\S]*)\1$/, '$2');
+      attrs.set(name.toLowerCase(), decodeAttr(value));
+    }
+
+    const src = attrs.get('src');
+    if (!src || attrs.has('srcset') || !canTransform(src)) return tag;
+
+    const additions: Record<string, string | undefined> = {
+      srcset: imageSrcset(src, widths, imageOpts),
+      sizes: attrs.has('sizes') ? undefined : sizes,
+      loading: attrs.has('loading') ? undefined : 'lazy',
+      decoding: attrs.has('decoding') ? undefined : 'async',
+    };
+
+    const newSrc = imageUrl(src, { ...imageOpts, width: fallbackWidth });
+    const extra = Object.entries(additions)
+      .filter(([, value]) => value !== undefined)
+      .map(([name, value]) => ` ${name}="${encodeAttr(value!)}"`)
+      .join('');
+
+    // Swap only the src value; everything else in the tag stays byte-for-byte.
+    const rewritten = tag.replace(
+      /(\ssrc\s*=\s*)("[^"]*"|'[^']*'|[^\s"'=<>`]+)/i,
+      (_, prefix: string) => `${prefix}"${encodeAttr(newSrc)}"`,
+    );
+
+    return rewritten.replace(/\s*(\/?)>$/, (_, slash: string) => `${extra}${slash ? ' /' : ''}>`);
+  });
 }
 
 /** @deprecated Renamed to {@link imageUrl}. Removed in 1.0. */
