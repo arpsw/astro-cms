@@ -4,6 +4,19 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`/sitemap.xml` URLs match the page's own hreflang and canonical.** `<loc>` and
+  the alternates are now built from each entry's `locale` + `path` with
+  `getLocaleUrl()`, absolutised against the Astro `site`, the same way the page
+  head builds them. Previously the route printed the CMS's prebuilt `url`, which
+  formats a locale homepage as `/sl` while the site serves and annotates `/sl/`,
+  so the sitemap listed URLs that the pages themselves did not declare. The CMS
+  `url` is still used when an entry has no path, its locale is not configured, or
+  the site has no `site` URL.
+
 ## [0.18.0] - 2026-10-14
 
 ### Changed

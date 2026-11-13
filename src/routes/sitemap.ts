@@ -11,7 +11,7 @@
 import type { APIRoute } from 'astro';
 // Import the package's PUBLIC runtime (not relative modules) so the resolved
 // config `define` is applied — same reasoning as routes/preview-enter.
-import { config, getSitemapInventory } from '@arpsw/astro-cms/runtime';
+import { config, getLocaleUrl, getSitemapInventory, isLocale } from '@arpsw/astro-cms/runtime';
 // Relative TYPE-only import: erased at compile time, so the "import the
 // public runtime" rule (which exists for the config `define`) doesn't apply.
 import type { SitemapEntry } from '../types';
@@ -28,6 +28,36 @@ const XML_ESCAPES: Record<string, string> = {
 
 function escapeXml(value: string): string {
   return value.replace(/[<>&'"]/g, (char) => XML_ESCAPES[char]);
+}
+
+/**
+ * The public URL of an entry, built by the frontend from the entry's locale and
+ * logical path with the same helper the page head uses for its hreflang and the
+ * language switcher (`getLocaleUrl`), absolutised against the site URL.
+ *
+ * The CMS's prebuilt `url` is NOT used when locale + path are available: the
+ * CMS formats URLs its own way (e.g. a locale homepage as `/sl` where the
+ * frontend serves `/sl/`), so the sitemap and the on-page annotations named
+ * different URLs for the same page. The frontend owns its URL shape; the CMS
+ * contract says as much and ships `locale` + `path` for exactly this. `url`
+ * remains the fallback for entries missing either (older CMS versions, or a
+ * locale this build does not know).
+ */
+function entryUrl(entry: SitemapEntry, site: URL | undefined): string {
+  if (!entry.path || !isLocale(entry.locale)) {
+    return entry.url;
+  }
+
+  const href = getLocaleUrl(entry.locale, entry.path);
+
+  // getLocaleUrl returns an absolute URL for a locale with its own website URL
+  // and a bare path otherwise. A sitemap needs absolute URLs; with no site URL
+  // to resolve against, the CMS's absolute `url` is the better answer.
+  if (/^https?:\/\//i.test(href)) {
+    return href;
+  }
+
+  return site ? new URL(href, site).href : entry.url;
 }
 
 function alternateLinks(group: SitemapEntry[]): string[] {
@@ -57,7 +87,7 @@ function alternateLinks(group: SitemapEntry[]): string[] {
   return links;
 }
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ site }) => {
   let entries: SitemapEntry[] = [];
   try {
     entries = await getSitemapInventory();
@@ -66,6 +96,9 @@ export const GET: APIRoute = async () => {
     // crawlers treat errors far worse than a temporarily sparse sitemap.
     entries = [];
   }
+
+  // One URL builder for <loc> and the alternates alike (see entryUrl).
+  entries = entries.map((entry) => ({ ...entry, url: entryUrl(entry, site) }));
 
   // Group translations of the same document for hreflang alternates. The
   // CMS's translation_group is authoritative (linked siblings keep their own
