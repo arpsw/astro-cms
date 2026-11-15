@@ -36,12 +36,22 @@ export interface ImagesConfig {
   transform: ImageTransformMode;
 }
 
-/** Edge (Cloudflare) `Cache-Control` headers set by the SSR routes. */
+/**
+ * Cache headers set by the SSR routes. `page`/`notFound` are the browser's
+ * `Cache-Control`; `pageEdge`/`notFoundEdge` go out as
+ * `Cloudflare-CDN-Cache-Control`, which Workers Cache reads and strips before
+ * the response reaches the browser. Keep `s-maxage`/`must-revalidate` out of
+ * the edge policy: they disable `stale-while-revalidate`.
+ */
 export interface CacheConfig {
-  /** Successful page/post responses. */
+  /** Browser `Cache-Control` for page/post/redirect responses. */
   page: string;
-  /** 404 responses (shorter TTL so new CMS content becomes reachable quickly). */
+  /** Edge policy for page/post/redirect responses. */
+  pageEdge: string;
+  /** Browser `Cache-Control` for 404 responses. */
   notFound: string;
+  /** Edge policy for 404s (short, so new CMS content becomes reachable quickly). */
+  notFoundEdge: string;
   /** Upstream/CMS errors — never cache. */
   error: string;
   /** Preview routes — never cache, never index. */
@@ -131,8 +141,13 @@ export interface ResolvedArpCmsConfig {
 }
 
 const DEFAULT_CACHE: CacheConfig = {
-  page: "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
-  notFound: "public, max-age=0, s-maxage=60",
+  page: "public, max-age=0",
+  // Fresh for an hour, then served stale while the Worker re-renders in the
+  // background. /api/purge invalidates (marks stale), so a publish is also
+  // refreshed in the background instead of leaving the page cold.
+  pageEdge: "max-age=3600, stale-while-revalidate=2592000",
+  notFound: "public, max-age=0",
+  notFoundEdge: "max-age=60",
   error: "no-store",
   preview: "no-store, no-cache, must-revalidate",
 };

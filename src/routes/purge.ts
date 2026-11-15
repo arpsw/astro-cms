@@ -7,13 +7,22 @@
  * The edge cache is Cloudflare Workers Cache (`cache.enabled` in the site's
  * wrangler config): Cloudflare caches the Worker's responses per their
  * Cache-Control headers and serves hits without invoking the Worker. This
- * route purges that cache in-process via `cache.purge()` from
+ * route invalidates that cache in-process via `cache.invalidate()` from
  * `cloudflare:workers`. No zone credentials are needed; the Worker owns its
  * cache. Invalidation is global (all tiers/colos), and the cache is
  * partitioned by Worker version, so deploys invalidate automatically.
  *
+ * `invalidate()` is a soft purge: entries are marked stale, not deleted. With
+ * `stale-while-revalidate` in the edge policy (`cache.pageEdge`), the next
+ * request gets the stale copy instantly while the Worker re-renders in the
+ * background, so a publish never leaves the site cold. The cost: the first
+ * request after a publish still sees the old version. Send `"hard": true` to
+ * delete instead (`cache.purge()`), e.g. when unpublished content must not be
+ * served even once; the next request then waits for a fresh render.
+ *
  * Auth: `Authorization: Bearer <PURGE_SECRET>`.
- * Body (all optional): `{ "everything": true }` | `{ "urls": [...] }` | `{ "tags": [...] }`.
+ * Body (all optional): `{ "everything": true }` | `{ "urls": [...] }` | `{ "tags": [...] }`,
+ * plus `"hard": true` to delete rather than invalidate.
  * Empty/absent body defaults to purge-everything (recommended for small sites).
  * `urls` are mapped to their pathnames and purged as path prefixes, which can
  * over-purge (a purged path also drops its sub-paths; purging `/` drops all).
@@ -34,6 +43,8 @@ interface PurgeBody {
   everything?: boolean;
   urls?: string[];
   tags?: string[];
+  /** Delete entries (`cache.purge()`) instead of marking them stale. */
+  hard?: boolean;
 }
 
 const json = (status: number, body: unknown): Response =>
@@ -99,8 +110,10 @@ export const POST: APIRoute = async ({ request }) => {
         ...(tags.length ? { tags } : {}),
       };
 
+  const mode = body.hard ? 'purge' : 'invalidate';
+
   try {
-    await cache.purge(options);
+    await (mode === 'purge' ? cache.purge(options) : cache.invalidate(options));
   } catch (err) {
     // Most likely Workers Cache is not enabled on this Worker (`cache.enabled`),
     // or the runtime does not support it (e.g. not on Cloudflare).
@@ -110,5 +123,5 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  return json(200, { ok: true, purged: options });
+  return json(200, { ok: true, mode, purged: options });
 };

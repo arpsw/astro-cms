@@ -4,10 +4,13 @@
 declare module 'cloudflare:workers' {
   export const env: Record<string, string | undefined>;
 
+  type CacheSelector = { purgeEverything: true } | { tags?: string[]; pathPrefixes?: string[] };
+
   /** Workers Cache purge API (https://developers.cloudflare.com/workers/cache/purge/). */
   export const cache: {
-    purge(
-      options: { purgeEverything: true } | { tags?: string[]; pathPrefixes?: string[] },
-    ): Promise<unknown>;
+    /** Delete matching entries. */
+    purge(options: CacheSelector): Promise<unknown>;
+    /** Mark matching entries stale (soft purge); same selectors as `purge()`. */
+    invalidate(options: CacheSelector): Promise<unknown>;
   };
 }

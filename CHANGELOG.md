@@ -4,6 +4,40 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-11-15
+
+### Changed
+
+- **`/api/purge` invalidates instead of deleting.** It now calls Workers Cache
+  `cache.invalidate()` (soft purge): entries are marked stale, the next request
+  gets the stale copy instantly, and the Worker re-renders in the background.
+  A publish no longer leaves the whole site cold for the next visitor or
+  crawler. The trade-off: the first request after a publish still sees the old
+  version. Send `"hard": true` in the body to delete instead (`cache.purge()`).
+  The response now reports `mode`.
+- **Edge and browser cache policies are separate headers.** Pages send the
+  browser `Cache-Control` (`cache.page`, default `public, max-age=0`) plus an
+  edge-only `Cloudflare-CDN-Cache-Control` (`cache.pageEdge`, default
+  `max-age=3600, stale-while-revalidate=2592000`), which Cloudflare strips before
+  the response reaches the browser. 404s likewise get `cache.notFoundEdge`
+  (`max-age=60`). The old defaults used `s-maxage`, which disables
+  `stale-while-revalidate` in Workers Cache, so the background refresh never
+  happened.
+
+### Added
+
+- **`applyCacheHeaders(headers, policy)`** in `/runtime`, for sites that set
+  cache headers in their own routes (`'page'`, `'notFound'`, `'error'`).
+
+### Migration
+
+- If you override `cache.page` with an `s-maxage` value, move the edge part to
+  `cache.pageEdge` without `s-maxage` (for example
+  `pageEdge: 'max-age=2592000, stale-while-revalidate=2592000'`) and let `page`
+  default.
+- Routes that set `Cache-Control: config.cache.page` themselves should call
+  `applyCacheHeaders(headers, 'page')` so they also send the edge policy.
+
 ## [0.19.0] - 2026-11-13
 
 ### Added

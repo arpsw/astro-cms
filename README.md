@@ -253,7 +253,7 @@ export const t = makeTranslator({
 | `previewToken` | | — | Bearer for `preview/*`; omit to disable preview |
 | `previewCookieTtl` | | `3600` | Preview-session cookie lifetime (seconds) |
 | `previewEditorOrigins` | | origin of `baseUrl` | Origins allowed to frame `/preview/*` for click-to-edit (array or comma-separated string) |
-| `cache` | | sensible defaults | `Cache-Control` overrides (`page`/`notFound`/`error`/`preview`) |
+| `cache` | | sensible defaults | Cache header overrides: browser `Cache-Control` (`page`/`notFound`/`error`/`preview`) and edge-only `Cloudflare-CDN-Cache-Control` (`pageEdge`/`notFoundEdge`). Apply them in your own routes with `applyCacheHeaders(headers, 'page' \| 'notFound' \| 'error')` |
 | `images` | | `{ transform: 'cloudflare' }` | Image delivery; `'off'` disables the `/cdn-cgi/image/` rewrites (see [Image transforms](#image-transforms)) |
 | `websiteUrls` | | `{}` | Per-locale canonical URLs; unset → path-prefix routing |
 | `localeMeta` | | `{}` | Per-locale display data (`code`, `native`, `english?`, `dir?`) for the language switcher + RTL |

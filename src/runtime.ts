@@ -79,7 +79,7 @@ export async function resolveRequest(
   }
 
   if (resolved?.type === 'redirect') {
-    ctx.response.headers.set('Cache-Control', config.cache.page);
+    applyCacheHeaders(ctx.response.headers, 'page');
     return {
       locale,
       path,
@@ -107,7 +107,7 @@ export async function resolveRequest(
   if (options.preview) {
     applyPreviewHeaders(ctx.response.headers);
   } else {
-    ctx.response.headers.set('Cache-Control', cacheHeaderFor(resolved, error));
+    applyCacheHeaders(ctx.response.headers, cachePolicyFor(resolved, error));
   }
 
   return {
@@ -135,11 +135,26 @@ function alternatesFrom(resolved: Resolved | null): Alternate[] | null {
   return Array.isArray(alternates) ? (alternates as Alternate[]) : null;
 }
 
-function cacheHeaderFor(resolved: Resolved | null, error: string | null): string {
-  if (error || !resolved) return config.cache.error;
-  if (resolved.type === 'page' || resolved.type === 'post') return config.cache.page;
-  if (resolved.type === 'not_found') return config.cache.notFound;
-  return config.cache.error;
+function cachePolicyFor(resolved: Resolved | null, error: string | null): CachePolicy {
+  if (error || !resolved) return 'error';
+  if (resolved.type === 'page' || resolved.type === 'post') return 'page';
+  if (resolved.type === 'not_found') return 'notFound';
+  return 'error';
+}
+
+export type CachePolicy = 'page' | 'notFound' | 'error';
+
+/**
+ * Set the browser `Cache-Control` and the edge-only
+ * `Cloudflare-CDN-Cache-Control` for a response. Policies without an edge
+ * entry (`error`) drop any edge header set earlier, so they are never cached.
+ */
+export function applyCacheHeaders(headers: Headers, policy: CachePolicy): void {
+  headers.set('Cache-Control', config.cache[policy]);
+  const edge =
+    policy === 'page' ? config.cache.pageEdge : policy === 'notFound' ? config.cache.notFoundEdge : '';
+  if (edge) headers.set('Cloudflare-CDN-Cache-Control', edge);
+  else headers.delete('Cloudflare-CDN-Cache-Control');
 }
 
 export { config } from './config';

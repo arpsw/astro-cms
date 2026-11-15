@@ -11,7 +11,13 @@
 import type { APIRoute } from 'astro';
 // Import the package's PUBLIC runtime (not relative modules) so the resolved
 // config `define` is applied — same reasoning as routes/preview-enter.
-import { config, getLocaleUrl, getSitemapInventory, isLocale } from '@arpsw/astro-cms/runtime';
+import {
+  applyCacheHeaders,
+  config,
+  getLocaleUrl,
+  getSitemapInventory,
+  isLocale,
+} from '@arpsw/astro-cms/runtime';
 // Relative TYPE-only import: erased at compile time, so the "import the
 // public runtime" rule (which exists for the config `define`) doesn't apply.
 import type { SitemapEntry } from '../types';
@@ -139,13 +145,10 @@ export const GET: APIRoute = async ({ site }) => {
     ``,
   ].join('\n');
 
-  return new Response(xml, {
-    headers: {
-      'Content-Type': 'application/xml; charset=utf-8',
-      // Same contract as pages: the edge holds it, the CMS's purge webhook
-      // drops it on publish. Without an explicit policy this was the one
-      // route left to Cloudflare's heuristic TTL.
-      'Cache-Control': config.cache.page,
-    },
-  });
+  // Same contract as pages: the edge holds it, the CMS's purge webhook
+  // invalidates it on publish. Without an explicit policy this was the one
+  // route left to Cloudflare's heuristic TTL.
+  const headers = new Headers({ 'Content-Type': 'application/xml; charset=utf-8' });
+  applyCacheHeaders(headers, 'page');
+  return new Response(xml, { headers });
 };
