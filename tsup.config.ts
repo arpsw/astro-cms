@@ -9,6 +9,8 @@ export default defineConfig({
     "src/routes/sitemap.ts",
     "src/routes/purge.ts",
     "src/dev/registry.ts",
+    "src/warm.ts",
+    "src/warm-cli.ts",
   ],
   format: ["esm"],
   dts: true,

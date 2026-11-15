@@ -258,6 +258,36 @@ export const t = makeTranslator({
 | `websiteUrls` | | `{}` | Per-locale canonical URLs; unset → path-prefix routing |
 | `localeMeta` | | `{}` | Per-locale display data (`code`, `native`, `english?`, `dir?`) for the language switcher + RTL |
 
+## Cache warming
+
+Workers Cache stores a page only after it has been served once, and each deploy
+starts with an empty cache. The warmer requests every URL in `/sitemap.xml`.
+
+On a schedule, from the site's own Worker: point wrangler `main` at a custom
+entry and add a Cron Trigger (`"triggers": { "crons": ["*/10 * * * *"] }`).
+
+```ts
+// src/worker.ts
+import { handle } from '@astrojs/cloudflare/handler';
+import { createScheduledWarmer } from '@arpsw/astro-cms/warm';
+
+export default {
+  fetch: handle,
+  scheduled: createScheduledWarmer({ siteUrl: 'https://example.com', intervalMinutes: 10 }),
+};
+```
+
+Each run warms one slice of `perRun` URLs (default 45, under the Free plan's 50
+subrequests) and rotates, so the whole sitemap is covered every
+`ceil(urls / perRun) * intervalMinutes` minutes.
+
+After a deploy, warm everything at once by chaining the CLI to the Workers
+Builds deploy command:
+
+```sh
+npx wrangler deploy && npx astro-cms-warm https://example.com --wait 30
+```
+
 ## Preview sessions
 
 Draft content lives behind the CMS `preview/*` endpoints, authed by the

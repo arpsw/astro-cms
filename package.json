@@ -1,6 +1,6 @@
 {
   "name": "@arpsw/astro-cms",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Astro integration for the ARP (Laravel) CMS — shared API client, i18n/path resolution, and config wiring for ARP CMS sites.",
   "type": "module",
   "license": "UNLICENSED",
@@ -25,6 +25,9 @@
     "README.md",
     "AGENTS.md"
   ],
+  "bin": {
+    "astro-cms-warm": "./dist/warm-cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -49,6 +52,10 @@
     "./dev": {
       "types": "./dist/dev/registry.d.ts",
       "import": "./dist/dev/registry.js"
+    },
+    "./warm": {
+      "types": "./dist/warm.d.ts",
+      "import": "./dist/warm.js"
     },
     "./CmsBlock.astro": "./src/components/CmsBlock.astro",
     "./EditableBlock.astro": "./src/components/EditableBlock.astro",

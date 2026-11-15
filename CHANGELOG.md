@@ -4,6 +4,21 @@ All notable changes to `@arpsw/astro-cms` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-11-15
+
+### Added
+
+- **Edge-cache warmer (`@arpsw/astro-cms/warm`).** Workers Cache only stores a
+  page after it has been served once, and every deploy starts with an empty
+  cache, so visitors and crawlers kept landing on cold pages. `warmSitemap()`
+  requests every URL in the site's `/sitemap.xml` (one request per URL fills
+  the tiered cache for all locations).
+  - `createScheduledWarmer({ siteUrl })` is a Worker `scheduled` handler for a
+    Cron Trigger. Each run warms one rotating slice (`perRun`, default 45), which
+    fits the Workers Free plan's 50 subrequests per invocation.
+  - The `astro-cms-warm <siteUrl> [--wait S]` CLI warms the whole sitemap, for
+    chaining after `wrangler deploy` in the Workers Builds deploy command.
+
 ## [0.20.0] - 2026-11-15
 
 ### Changed
